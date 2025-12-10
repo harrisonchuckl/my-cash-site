@@ -10,9 +10,9 @@ from duckduckgo_search import DDGS
 # ⚙️  CONFIGURATION
 # ==========================================
 SITE_CONTENT_PATH = "./content"
-SITE_START_DATE = datetime.date(2025, 5, 20) # LAUNCH DATE
-AMAZON_TAG = "yourtag-21"         # Your Amazon Associate ID
-CURRENT_YEAR = datetime.date.today().year # Auto-detects 2025
+SITE_START_DATE = datetime.date(2025, 12, 10) 
+AMAZON_TAG = "yourtag-21"         
+CURRENT_YEAR = datetime.date.today().year
 
 #  🔑  READ API KEY
 try:
@@ -20,7 +20,7 @@ try:
         API_KEY = f.read().strip()
     client = OpenAI(api_key=API_KEY)
 except FileNotFoundError:
-    print(" ❌  ERROR: 'key.txt' not found. Please create it.")
+    print(" ❌  ERROR: 'key.txt' not found.")
     exit()
 
 # ==========================================
@@ -30,10 +30,10 @@ def check_quota():
     today = datetime.date.today()
     days_alive = (today - SITE_START_DATE).days
     
-    # Define Safe Speed Limits
-    if days_alive < 30: limit = 5      # Month 1
-    elif days_alive < 60: limit = 10   # Month 2
-    else: limit = 50                   # Month 3+
+    # Safe Speed Limits
+    if days_alive < 30: limit = 5
+    elif days_alive < 60: limit = 10
+    else: limit = 50
     
     log_file = "post_history.json"
     if not os.path.exists(log_file): history = {}
@@ -44,6 +44,7 @@ def check_quota():
     today_count = history.get(today_str, 0)
     
     print(f" 📊  Daily Quota: {today_count}/{limit} | Site Age: {days_alive} days")
+    
     if today_count >= limit:
         print(f" 🛑  DAILY LIMIT REACHED. Stopping.")
         return False
@@ -59,113 +60,128 @@ def log_success():
     with open(log_file, "w") as f: json.dump(history, f)
 
 # ==========================================
-#  🧠  MODULE 2: BRAIN (TOPIC GENERATOR)
+#  🧠  MODULE 2: BRAIN & RESEARCHER
 # ==========================================
 def generate_topic_list(seed_category, count=10):
-    print(f" 🧠  Brainstorming {count} topics for '{seed_category}' ({CURRENT_YEAR})...")
-    # FIX: We now force the CURRENT YEAR in the prompt to stop 2023 hallucinations
-    prompt = f"Generate a list of {count} specific 'Best X' product comparison titles related to '{seed_category}' for the year {CURRENT_YEAR}. Output ONLY the list, one per line."
-    
-    response = client.chat.completions.create(
-        model="gpt-4o", messages=[{"role": "user", "content": prompt}]
-    )
+    print(f" 🧠  Brainstorming {count} UK topics for '{seed_category}'...")
+    prompt = f"Generate {count} specific 'Best X' product titles for UK market {CURRENT_YEAR}. Focus on items popular in Britain. Output list only."
+    response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
     raw = response.choices[0].message.content.strip().split("\n")
-    topics = [t.strip("- ").split(". ")[-1] for t in raw if t]
-    return topics
+    return [t.strip("- ").split(". ")[-1] for t in raw if t]
 
-# ==========================================
-#  🔎  MODULE 3: RESEARCHER (10 PRODUCTS)
-# ==========================================
 def find_real_products(topic):
-    print(f"    🔎  Researching 10 real products for: {topic}...")
+    print(f"    🔎  Researching 10 UK products for: {topic}...")
     try:
-        # We need more search data to find 10 items
         with DDGS() as ddgs:
-            # We search for "best X list", "top rated X", etc. to get variety
-            # FIX: Force current year in search query
-            results1 = list(ddgs.text(f"best {topic} to buy {CURRENT_YEAR} review", max_results=5))
-            results2 = list(ddgs.text(f"top 10 {topic} amazon uk {CURRENT_YEAR}", max_results=5))
-            results = results1 + results2
-            
+            # Search specifically for UK reviews and buying guides
+            results = list(ddgs.text(f"best top rated {topic} uk {CURRENT_YEAR} reviews", max_results=15))
         if not results: return []
         
-        # Ask AI to extract 10 distinct names
-        prompt = f"Extract 10 distinct and specific product names from these search snippets. Return ONLY a comma-separated list of names. Snippets: {str(results)}"
-        
-        response = client.chat.completions.create(
-            model="gpt-4o", messages=[{"role": "user", "content": prompt}]
-        )
-        
+        prompt = f"Extract 10 distinct product names from these UK snippets: {str(results)}. Return comma-separated list."
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         names = response.choices[0].message.content.split(",")
-        # Ensure we have clean names and limit to 10
-        cleaned_names = [n.strip() for n in names if n.strip()][:10]
         
         products = []
-        for name in cleaned_names:
-            link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
-            products.append({"name": name, "link": link})
-            
+        for name in names[:10]:
+            clean = name.strip()
+            # UK Affiliate Search Link
+            link = f"https://www.amazon.co.uk/s?k={clean.replace(' ', '+')}&tag={AMAZON_TAG}"
+            # Add dynamic placeholder for the grid
+            products.append({
+                "name": clean, 
+                "link": link, 
+                "price_range": "Check Price £" 
+            })
         return products
     except Exception as e:
-        print(f"   ⚠️  Search warning: {e}")
+        print(f"   ⚠️  Search error: {e}")
         return []
 
 # ==========================================
-#  ✍️  MODULE 4: WRITER (PAGE CREATOR)
+#  ✍️  MODULE 3: WRITER (PROFESSIONAL GRID)
 # ==========================================
 def create_page(topic, page_type="reviews"):
     if not check_quota(): return False
-    real_products = find_real_products(topic) if page_type == "reviews" else []
+    products = find_real_products(topic) if page_type == "reviews" else []
     
+    # 1. Build Product YAML for Front Matter (Required for the new Grid Layout)
+    products_yaml = ""
+    for p in products:
+        products_yaml += f"\n  - name: \"{p['name']}\"\n    link: \"{p['link']}\"\n    price_range: \"{p['price_range']}\""
+
+    # 2. Engagement Widgets (Combined: Stars + Comments)
     engagement_html = """
-    <div class="engagement-box" style="margin-top:40px; border-top:1px solid #ddd; padding-top:20px;">
-        <h3>Rate this Guide</h3>
-        <div class="stars" onclick="rate(this)" style="cursor:pointer; font-size:2rem; color:#f4c542;">
+    <div id="engagement-section" style="margin-top:50px; padding:20px; background:#f8fafc; border-radius:12px;">
+       <h3 style="text-align:center;">Rate this Guide</h3>
+       <div class="stars" onclick="rate(this)" style="text-align:center; cursor:pointer; font-size:2.5rem; color:#f59e0b;">
             &#9734;&#9734;&#9734;&#9734;&#9734;
-        </div>
-        <p id="msg" style="display:none; color:green;">Thanks for voting!</p>
-        <script>
+       </div>
+       <p id="msg" style="display:none; text-align:center; color:green; font-weight:bold;">Thanks for voting!</p>
+       <script>
             function rate(el) {
                 el.innerHTML = "&#9733;&#9733;&#9733;&#9733;&#9733;";
                 document.getElementById('msg').style.display='block';
                 localStorage.setItem('voted_'+window.location.pathname, 'true');
             }
-        </script>
-        <h3>Discussion</h3>
-        <p>Have a question? <a href="mailto:contact@yoursite.com?subject=Comment on {{ .Title }}">Email us</a>.</p>
-    </div>
+       </script>
+
+       <hr style="margin: 30px 0; border-color: #e2e8f0;">
+       <h3>User Reviews</h3>
+       <div id="comments-placeholder">
+            <p><em>Comments are enabled. (Configure Giscus ID in manager.py to activate).</em></p>
+       </div>
+       </div>
     """
-    
-    # FIX: Force current year in writing prompt
+
+    # 3. Write Content (British English)
     prompt = f"""
-    Write a detailed Hugo Markdown {page_type} post for '{topic}' (Year: {CURRENT_YEAR}).
-    - Front Matter: Title (Must include "{CURRENT_YEAR}"), Date, Description, Tags.
-    - LIST OF 10 REAL PRODUCTS: {str(real_products)}.
-    - INSTRUCTIONS:
-      1. Create a "Top 10 Quick Comparison" table at the start.
-      2. Write a mini-review for ALL 10 products.
-      3. For every product name, link it using the 'link' provided in the data.
-    - Structure: Intro, Comparison Table, 10 Product Reviews, Buying Guide, Conclusion.
-    - Append this HTML at the end: {engagement_html}
+    Write a Professional British English Review for '{topic}'.
+    
+    - **Front Matter:**
+      - title: "{topic} (UK Guide {CURRENT_YEAR})"
+      - date: {datetime.date.today()}
+      - tags: ["Reviews", "Home", "Best Of"]
+    
+    - **Content:**
+      1. Professional Intro.
+      2. **Important:** Do NOT write a markdown comparison table. I will insert the widget automatically.
+      3. Detailed Mini-Reviews for the 10 products listed below.
+      4. Buying Guide.
+      5. Conclusion.
+    
+    - **Tone:** Professional, Helpful, British spelling (Colour, Customised).
+    - **Products:** {str([p['name'] for p in products])}
     """
     
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o", messages=[{"role": "user", "content": prompt}]
-        )
-        content = response.choices[0].message.content.strip()
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
+        body = response.choices[0].message.content.strip()
         
-        # Safety Check for Front Matter (Strip whitespace)
-        if not content.startswith("---"):
-             if "---" in content:
-                 content = "---\n" + content.split("---", 1)[1]
+        # Cleanup if AI adds dashes
+        if "---" in body: body = body.split("---", 2)[2].strip()
 
+        # Construct Final File with Structured Data + Widgets
+        final_content = f"""---
+title: "{topic} (UK Guide {CURRENT_YEAR})"
+date: {datetime.date.today()}
+description: "Professional review of the best {topic} in the UK market."
+tags: ["Reviews", "Home"]
+products: {products_yaml}
+---
+
+{body}
+
+{{{{< top10_grid >}}}}
+
+{engagement_html}
+"""
+        
         filename = topic.lower().replace(" ", "-")[:50] + ".md"
         path = os.path.join(SITE_CONTENT_PATH, page_type, filename)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         
         with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+            f.write(final_content)
             
         log_success()
         print(f"    ✅  PUBLISHED: {filename}")
@@ -179,24 +195,25 @@ def create_page(topic, page_type="reviews"):
 #  🚀  MAIN CONTROL PANEL
 # ==========================================
 if __name__ == "__main__":
-    print(f"\n---  🤖  GOD ENGINE ACTIVATED (Year: {CURRENT_YEAR}) ---")
+    print(f"\n--- 🤖 GOD ENGINE v5.0 (Professional UK Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
     
     mode = input("Select Mode (1/2): ")
     
     if mode == "1":
-        topic = input("Enter Topic: ")
+        topic = input("Enter Topic (e.g. Best Air Fryers): ")
         create_page(topic, "reviews")
         
     elif mode == "2":
-        seed = input("Enter Broad Category: ")
+        seed = input("Enter Broad Category (e.g. Kitchen Appliances): ")
         qty = int(input("How many pages? (Max 10): "))
         
         topics = generate_topic_list(seed, qty)
         print(f" 📋  Queued {len(topics)} topics...")
+        time.sleep(1)
         
         for t in topics:
             success = create_page(t, "reviews")
             if not success: break
-            time.sleep(2)
+            time.sleep(3)
