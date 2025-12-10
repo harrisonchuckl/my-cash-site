@@ -110,46 +110,61 @@ def generate_topic_list(seed_category, count=10):
 def find_real_products(topic):
     print(f"    🧠 Generating 10 UK products for: {topic}...")
     try:
-        # --- LOGIC: FORCE AI TO RETURN 10 NAMES ---
+        # --- LOGIC: FORCE AI TO RETURN 10 NAMES + MINI-REVIEW ---
         prompt = f"""
         Act as a professional UK reviewer. Your task is to generate exactly 10 distinct and specific PHYSICAL product names for '{topic}' that are currently popular and highly rated in the UK market in {CURRENT_YEAR}.
         
+        For each product, you MUST also provide a 2-sentence summary/mini-review.
+        
         CRITICAL INSTRUCTION: If you cannot recall 10 distinct, real product names, you MUST generate plausible, specific, and realistic-sounding model names (e.g., 'Xiaomi Smart Umbrella Pro X-20', 'Kisha Sensor Umbrella V3') to complete the list of 10. 
         
-        Output ONLY a comma-separated list of the 10 names. 
+        Output ONLY a valid JSON array of objects with 'name' and 'summary' fields. DO NOT return anything less than 10 objects.
+        
+        Example JSON Structure:
+        [
+            {{"name": "Ninja Foodi MAX Dual Zone Air Fryer", "summary": "This dual-zone air fryer is perfect for cooking two different meals at once. Its large capacity makes it ideal for family cooking."}},
+            {{"name": "Instant Pot Duo Crisp", "summary": "A versatile pressure cooker and air fryer combo, offering 11-in-1 functionality. It's a great space-saver for any modern kitchen."}}
+        ]
         """
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         raw_output = response.choices[0].message.content.strip()
 
-        # Check for any rogue failure signals the AI might try to send
-        if "FAIL" in raw_output.upper() or "NOT LIST" in raw_output.upper():
-            # This is the last line of defense, but should be rare now
-            print("   ⚠️ AI failed to confidently generate 10 real products.")
-            return []
+        # Safety check: Remove markdown fences if the AI added them
+        if raw_output.startswith("```json"):
+            raw_output = raw_output.replace("```json", "").replace("```", "").strip()
 
-        # Proceed with processing the comma-separated list
-        names = raw_output.split(",")
+        if "FAIL" in raw_output.upper() or not raw_output.startswith("["):
+            print("   ⚠️ AI failed to confidently generate 10 products in correct JSON format.")
+            return []
+            
+        product_data = json.loads(raw_output)
+
         products = []
-        cleaned_names = [n.strip() for n in names if n.strip()][:10]
-        
+        for item in product_data[:10]:
+            name = item.get("name", "").strip()
+            summary = item.get("summary", "").strip()
+            
+            if name and summary:
+                # UK Affiliate Search Link (SAFEST OPTION)
+                link = f"[https://www.amazon.co.uk/s?k=](https://www.amazon.co.uk/s?k=){name.replace(' ', '+')}&tag={AMAZON_TAG}"
+                
+                products.append({
+                    "name": name, 
+                    "link": link, 
+                    "price_range": "Check Price £",
+                    "summary": summary
+                })
+
         # --- CRITICAL GUARDRAIL: Must have 10 products ---
-        if len(cleaned_names) != 10:
-            # If the AI ignored the instruction, we skip the topic
-            print(f"   ⚠️ AI returned {len(cleaned_names)} products. Skipping topic to prevent publishing a thin page.")
+        if len(products) != 10:
+            print(f"   ⚠️ Could not extract 10 products from JSON. Skipping topic.")
             return []
         # ----------------------------
 
-        for name in cleaned_names:
-            # UK Affiliate Search Link (SAFEST OPTION)
-            link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
-            # Add dynamic placeholder for the grid
-            products.append({
-                "name": name, 
-                "link": link, 
-                "price_range": "Check Price £" 
-            })
-            
         return products
+    except json.JSONDecodeError as e:
+        print(f"   ❌ JSON Parsing Error: AI output was not clean JSON. {e}")
+        return []
     except Exception as e:
         print(f"   ❌ Product Generation Error: {e}")
         return []
@@ -168,7 +183,8 @@ def create_page(topic, page_type="reviews"):
     # 3. Build Product YAML for Front Matter
     products_yaml = ""
     for p in products:
-        products_yaml += f"\n  - name: \"{p['name']}\"\n    link: \"{p['link']}\"\n    price_range: \"{p['price_range']}\""
+        # NOTE: Added summary field to YAML structure
+        products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "'")}"'
 
     # 4. Engagement Widgets
     engagement_html = """
@@ -195,6 +211,7 @@ def create_page(topic, page_type="reviews"):
     """
 
     # 5. Write Content (British English)
+    # The prompt MUST change to reflect that the mini-reviews are already generated.
     prompt = f"""
     Write a Professional British English Review for '{topic}'.
     
@@ -205,13 +222,11 @@ def create_page(topic, page_type="reviews"):
     
     - **Content:**
       1. Professional Intro.
-      2. **Important:** Do NOT write a markdown comparison table. I will insert the widget automatically.
-      3. Detailed Mini-Reviews for the 10 products listed below.
-      4. Buying Guide.
-      5. Conclusion.
+      2. **CRITICAL:** Do NOT write mini-reviews or a comparison table. I will insert the ranked cards automatically.
+      3. Write a detailed Buying Guide section.
+      4. Conclusion.
     
     - **Tone:** Professional, Helpful, British spelling (Colour, Customised).
-    - **Products:** {str([p['name'] for p in products])}
     """
     
     try:
@@ -221,7 +236,7 @@ def create_page(topic, page_type="reviews"):
         # Cleanup if AI adds dashes
         if "---" in body: body = body.split("---", 2)[2].strip()
 
-        # Construct Final File with Structured Data + Widgets
+        # Construct Final File with Structured Data + Ranked Cards
         final_content = f"""---
 title: "{topic} (UK Guide {CURRENT_YEAR})"
 date: {datetime.date.today()}
@@ -232,7 +247,7 @@ products: {products_yaml}
 
 {body}
 
-{{{{< top10_grid >}}}}
+{{{{< ranked_cards >}}}}
 
 {engagement_html}
 """
@@ -258,7 +273,7 @@ products: {products_yaml}
 def run_god_engine():
     global OVERRIDE_ACTIVE 
     
-    print(f"\n--- 🤖 GOD ENGINE v9.1 (Final Reliability Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v10.0 (Ranked Card Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
     print("3. ⚠️ EMERGENCY QUOTA OVERRIDE (DANGEROUS)")
@@ -273,7 +288,7 @@ def run_god_engine():
             mode = input("Select operation (1 or 2) for Override Mode: ")
         else:
             print("❌ Override cancelled. Restarting.")
-            return run_god_engine() # Restart to select a mode
+            return run_god_engine() 
 
     if mode == "1":
         topic = input("Enter Topic (e.g. Best Air Fryers): ")
