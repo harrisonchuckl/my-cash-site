@@ -30,7 +30,7 @@ def check_quota():
     today = datetime.date.today()
     days_alive = (today - SITE_START_DATE).days
     
-    # Safe Speed Limits
+    # Safe Speed Limits (5, 10, 50 pages/day)
     if days_alive < 30: limit = 5
     elif days_alive < 60: limit = 10
     else: limit = 50
@@ -60,7 +60,7 @@ def log_success():
     with open(log_file, "w") as f: json.dump(history, f)
 
 # ==========================================
-#  🧠  MODULE 2: BRAIN & RESEARCHER
+#  🧠  MODULE 2: BRAIN & RESEARCHER (AI-FIRST)
 # ==========================================
 def generate_topic_list(seed_category, count=10):
     print(f" 🧠  Brainstorming {count} UK topics for '{seed_category}'...")
@@ -70,29 +70,28 @@ def generate_topic_list(seed_category, count=10):
     return [t.strip("- ").split(". ")[-1] for t in raw if t]
 
 def find_real_products(topic):
-    print(f"    🔎  Researching 10 UK products for: {topic}...")
+    print(f"    🧠 Generating 10 UK products for: {topic}...")
     try:
-        with DDGS() as ddgs:
-            # Search deeper to find 10 unique product names
-            results = list(ddgs.text(f"best top rated {topic} uk {CURRENT_YEAR} reviews", max_results=30))
-        if not results: return []
-        
-        # We ask for 10 distinct names
-        prompt = f"From the following UK snippets, extract 10 distinct and specific PHYSICAL product names (e.g., 'Ninja AF101', 'Simplehuman Sensor Mirror'). Return ONLY a comma-separated list of names. Snippets: {str(results)}"
+        # --- NEW LOGIC: Use AI to generate 10 product names directly ---
+        prompt = f"""
+        Act as a professional UK reviewer. Generate a list of 10 distinct and specific PHYSICAL product names for '{topic}' that are currently popular and highly rated in the UK market in {CURRENT_YEAR}.
+        Output ONLY a comma-separated list of the 10 names. 
+        """
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         names = response.choices[0].message.content.split(",")
         
-        # --- CRITICAL NEW GUARDRAIL ---
         products = []
+        # Ensure we take only up to 10 products
         cleaned_names = [n.strip() for n in names if n.strip()][:10]
         
+        # --- CRITICAL GUARDRAIL: Failsafe if AI can't generate names ---
         if len(cleaned_names) < 5:
-            print(f"   ⚠️ AI only found {len(cleaned_names)} specific products. Skipping topic to prevent crash.")
+            print(f"   ⚠️ AI only generated {len(cleaned_names)} products. Skipping topic to prevent publishing a thin page.")
             return []
-        # --------------------------------
+        # ----------------------------
 
         for name in cleaned_names:
-            # UK Affiliate Search Link
+            # UK Affiliate Search Link (ALWAYS affiliate link to Amazon UK Search)
             link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
             # Add dynamic placeholder for the grid
             products.append({
@@ -100,26 +99,27 @@ def find_real_products(topic):
                 "link": link, 
                 "price_range": "Check Price £" 
             })
+            
         return products
     except Exception as e:
-        print(f"   ❌ Final Search Error: {e}")
+        print(f"   ❌ Product Generation Error: {e}")
         return []
 
 # ==========================================
 #  ✍️  MODULE 3: WRITER (PROFESSIONAL GRID)
 # ==========================================
 def create_page(topic, page_type="reviews"):
-    # Exit if Quota is hit OR if product finder returned < 5 products
+    # Exit if Quota is hit OR if product finder failed
     products = find_real_products(topic) if page_type == "reviews" else []
     if not products: return False
     if not check_quota(): return False
     
-    # 1. Build Product YAML for Front Matter (Required for the new Grid Layout)
+    # 1. Build Product YAML for Front Matter
     products_yaml = ""
     for p in products:
         products_yaml += f"\n  - name: \"{p['name']}\"\n    link: \"{p['link']}\"\n    price_range: \"{p['price_range']}\""
 
-    # 2. Engagement Widgets (Combined: Stars + Comments)
+    # 2. Engagement Widgets (Stars + Comments)
     engagement_html = """
     <div id="engagement-section" style="margin-top:50px; padding:20px; background:#f8fafc; border-radius:12px;">
        <h3 style="text-align:center;">Rate this Guide</h3>
@@ -205,7 +205,7 @@ products: {products_yaml}
 #  🚀  MAIN CONTROL PANEL
 # ==========================================
 if __name__ == "__main__":
-    print(f"\n--- 🤖 GOD ENGINE v6.0 (Professional UK Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v7.0 (AI-First UK Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
     
