@@ -26,7 +26,14 @@ except FileNotFoundError:
 # ==========================================
 #  🛡️  MODULE 1: SAFETY MANAGER
 # ==========================================
+# Global flag to track if the override is active
+OVERRIDE_ACTIVE = False 
+
 def check_quota():
+    # If the global override flag is set, always return True
+    if OVERRIDE_ACTIVE:
+        return True
+    
     today = datetime.date.today()
     days_alive = (today - SITE_START_DATE).days
     
@@ -62,36 +69,76 @@ def log_success():
 # ==========================================
 #  🧠  MODULE 2: BRAIN & RESEARCHER (AI-FIRST)
 # ==========================================
+def get_existing_titles():
+    """Reads all existing markdown files to create a blacklist."""
+    existing_titles = set()
+    reviews_path = os.path.join(SITE_CONTENT_PATH, "reviews")
+    if os.path.exists(reviews_path):
+        for filename in os.listdir(reviews_path):
+            if filename.endswith(".md"):
+                # Clean filename to match potential topic titles
+                title = filename.replace(".md", "").replace("-", " ").title()
+                existing_titles.add(title)
+    return existing_titles
+
 def generate_topic_list(seed_category, count=10):
     print(f" 🧠  Brainstorming {count} UK topics for '{seed_category}'...")
-    prompt = f"Generate {count} specific 'Best X' product titles for UK market {CURRENT_YEAR}. Focus on items popular in Britain. Output list only."
+    existing_titles = get_existing_titles()
+    
+    # Inject current topics into the prompt to avoid immediate duplicates
+    blacklist_prompt = ""
+    if existing_titles:
+        # Pass a few titles back to the AI for smarter generation
+        blacklist_sample = ", ".join(list(existing_titles)[:5]) 
+        blacklist_prompt = f"DO NOT generate any titles similar to these: {blacklist_sample}. "
+    
+    prompt = f"Generate {count} specific 'Best X' product titles for UK market {CURRENT_YEAR}. {blacklist_prompt}Focus on items popular in Britain. Output list only."
+    
     response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
-    raw = response.choices[0].message.content.strip().split("\n")
-    return [t.strip("- ").split(". ")[-1] for t in raw if t]
+    raw_list = response.choices[0].message.content.strip().split("\n")
+    
+    # Filter the list after generation to catch any duplicates the AI missed
+    new_topics = []
+    for t in raw_list:
+        clean_t = t.strip("- ").split(". ")[-1]
+        # Very simple check for duplication
+        if clean_t.split()[0].title() not in existing_titles:
+            new_topics.append(clean_t)
+        
+    return new_topics[:count]
 
 def find_real_products(topic):
     print(f"    🧠 Generating 10 UK products for: {topic}...")
     try:
-        # --- NEW LOGIC: Use AI to generate 10 product names directly ---
+        # --- LOGIC: Use AI to generate 10 product names directly ---
         prompt = f"""
-        Act as a professional UK reviewer. Generate a list of 10 distinct and specific PHYSICAL product names for '{topic}' that are currently popular and highly rated in the UK market in {CURRENT_YEAR}.
-        Output ONLY a comma-separated list of the 10 names. 
+        Act as a professional UK reviewer. Your task is to generate exactly 10 distinct and specific PHYSICAL product names for '{topic}' that are currently popular and highly rated in the UK market in {CURRENT_YEAR}.
+        
+        If you cannot name 10 unique, real products, you MUST return the single word 'FAIL'.
+        
+        If you successfully name 10 products, Output ONLY a comma-separated list of the 10 names. 
         """
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
-        names = response.choices[0].message.content.split(",")
-        
+        raw_output = response.choices[0].message.content.strip()
+
+        # Check for the FAIL signal first
+        if "FAIL" in raw_output.upper():
+            print("   ⚠️ AI failed to confidently generate 10 real products.")
+            return []
+
+        # Proceed with processing the comma-separated list
+        names = raw_output.split(",")
         products = []
-        # Ensure we take only up to 10 products
         cleaned_names = [n.strip() for n in names if n.strip()][:10]
         
-        # --- CRITICAL GUARDRAIL: Failsafe if AI can't generate names ---
-        if len(cleaned_names) < 5:
-            print(f"   ⚠️ AI only generated {len(cleaned_names)} products. Skipping topic to prevent publishing a thin page.")
+        # --- CRITICAL GUARDRAIL: Must have 10 products ---
+        if len(cleaned_names) != 10:
+            print(f"   ⚠️ AI returned {len(cleaned_names)} products. Skipping topic to prevent publishing a thin page.")
             return []
         # ----------------------------
 
         for name in cleaned_names:
-            # UK Affiliate Search Link (ALWAYS affiliate link to Amazon UK Search)
+            # UK Affiliate Search Link (SAFEST OPTION)
             link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
             # Add dynamic placeholder for the grid
             products.append({
@@ -109,17 +156,19 @@ def find_real_products(topic):
 #  ✍️  MODULE 3: WRITER (PROFESSIONAL GRID)
 # ==========================================
 def create_page(topic, page_type="reviews"):
-    # Exit if Quota is hit OR if product finder failed
+    # 1. Product Generation
     products = find_real_products(topic) if page_type == "reviews" else []
     if not products: return False
+    
+    # 2. Quota Check
     if not check_quota(): return False
     
-    # 1. Build Product YAML for Front Matter
+    # 3. Build Product YAML for Front Matter
     products_yaml = ""
     for p in products:
         products_yaml += f"\n  - name: \"{p['name']}\"\n    link: \"{p['link']}\"\n    price_range: \"{p['price_range']}\""
 
-    # 2. Engagement Widgets (Stars + Comments)
+    # 4. Engagement Widgets
     engagement_html = """
     <div id="engagement-section" style="margin-top:50px; padding:20px; background:#f8fafc; border-radius:12px;">
        <h3 style="text-align:center;">Rate this Guide</h3>
@@ -143,7 +192,7 @@ def create_page(topic, page_type="reviews"):
     </div>
     """
 
-    # 3. Write Content (British English)
+    # 5. Write Content (British English)
     prompt = f"""
     Write a Professional British English Review for '{topic}'.
     
@@ -204,13 +253,26 @@ products: {products_yaml}
 # ==========================================
 #  🚀  MAIN CONTROL PANEL
 # ==========================================
-if __name__ == "__main__":
-    print(f"\n--- 🤖 GOD ENGINE v7.0 (AI-First UK Edition) ---")
+def run_god_engine():
+    global OVERRIDE_ACTIVE 
+    
+    print(f"\n--- 🤖 GOD ENGINE v9.0 (Ultimate Reliability Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
+    print("3. ⚠️ EMERGENCY QUOTA OVERRIDE (DANGEROUS)")
     
-    mode = input("Select Mode (1/2): ")
+    mode = input("Select Mode (1/2/3): ")
     
+    if mode == "3":
+        confirmation = input("🚨 WARNING: This bypasses sandbox limits. Type 'YES' to proceed: ")
+        if confirmation.upper() == 'YES':
+            OVERRIDE_ACTIVE = True
+            print("🟢 QUOTA OVERRIDE ACTIVE. Running in HIGH-SPEED mode.")
+            mode = input("Select operation (1 or 2) for Override Mode: ")
+        else:
+            print("❌ Override cancelled. Restarting.")
+            return run_god_engine() # Restart to select a mode
+
     if mode == "1":
         topic = input("Enter Topic (e.g. Best Air Fryers): ")
         create_page(topic, "reviews")
@@ -220,10 +282,16 @@ if __name__ == "__main__":
         qty = int(input("How many pages? (Max 10): "))
         
         topics = generate_topic_list(seed, qty)
-        print(f" 📋  Queued {len(topics)} topics...")
+        print(f" 📋  Queued {len(topics)} non-duplicate topics. Starting run...")
         time.sleep(1)
         
         for t in topics:
+            print(f"--- Attempting: {t} ---")
             success = create_page(t, "reviews")
             if not success: break
             time.sleep(3)
+        
+        print("\n✨ Batch run complete.")
+
+if __name__ == "__main__":
+    run_god_engine()
