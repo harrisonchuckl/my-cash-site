@@ -11,6 +11,9 @@ languageCode = "en-us"
 
 [params]
   defaultTheme = "light"
+  # 1. New: Hide the theme toggle button and enforce light mode
+  disableThemeToggle = true
+  
   # This shows the "Review", "Directory", "Recipe" links at the top
   [params.homeInfoParams]
     Title = "Welcome"
@@ -21,13 +24,22 @@ languageCode = "en-us"
   name = "Product Reviews"
   url = "/reviews/"
   weight = 10
+
+# 2. New: Added About Us link (Positioned with weight 20 for visibility)
+[[menu.main]]
+  identifier = "about"
+  name = "About Us"
+  url = "/about/"
+  weight = 20
+
 [[menu.main]]
   identifier = "directory"
   name = "Local Directory"
   url = "/directory/"
-  weight = 20
+  weight = 30 # Moved down to accommodate "About Us"
+
 [[menu.main]]
   identifier = "recipes"
   name = "Recipes"
   url = "/recipes/"
-  weight = 30
+  weight = 40 # Moved down
