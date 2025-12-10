@@ -1,7 +1,7 @@
 /* --- PROFESSIONAL THEME OVERRIDE --- */
 :root {
     --primary: #0f766e;       /* Professional Teal */
-    --secondary: #0f172a;     /* Deep Slate Navy */
+    --secondary: #0f172a;     /* Deep Slate Navy (Header Banner Color) */
     --accent: #f59e0b;        /* Amazon Orange */
     --bg-gray: #f8fafc;
     --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
@@ -14,6 +14,13 @@ body { background-color: var(--bg-gray); color: #334155; }
 .logo a { color: white !important; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
 #menu a { color: #cbd5e1; font-weight: 500; transition: color 0.2s; }
 #menu a:hover { color: white; }
+
+/* NEW RULE: Set all headings to the dark navy color */
+h1, h2, h3, h4, h5, h6, 
+.post-title, 
+.page-header h1 {
+    color: var(--secondary) !important; 
+}
 
 /* 2. CATEGORY TILES (Landing Pages) */
 .category-grid {
@@ -75,6 +82,7 @@ body { background-color: var(--bg-gray); color: #334155; }
     border-radius: 6px;
     text-decoration: none;
     display: block;
+    width: 100%;
     transition: background 0.2s;
 }
 .amz-btn:hover { background: #d97706; }
