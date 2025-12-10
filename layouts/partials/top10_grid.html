@@ -1,0 +1,15 @@
+<h2 style="text-align:center; margin-top:50px; font-size:2rem; color:var(--secondary);">🏆 Top 10 Recommended</h2>
+<div class="product-grid">
+    {{ range .Params.products }}
+    <div class="product-card">
+        <div class="product-placeholder">
+            <span>Product Image</span>
+        </div>
+        <div>
+            <div class="product-title">{{ .name }}</div>
+            <div class="product-price">{{ .price_range }}</div>
+            <a href="{{ .link }}" target="_blank" class="amz-btn">Check Price on Amazon UK</a>
+        </div>
+    </div>
+    {{ end }}
+</div>
