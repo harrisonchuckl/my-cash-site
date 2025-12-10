@@ -1,0 +1,22 @@
+<div class="ranked-products-container">
+    {{ range $index, $element := .Params.products }}
+    <div class="ranked-card">
+        <div class="rank-number">{{ add $index 1 }}</div>
+
+        <div class="product-content">
+            <div class="product-image-placeholder">
+                <span>Product Image (Rank {{ add $index 1 }})</span>
+            </div>
+
+            <div class="text-area">
+                <h3 class="product-title">{{ $element.name }}</h3>
+                <p class="product-summary">{{ $element.summary }}</p>
+                <div class="price-and-button">
+                    <span class="product-price">{{ $element.price_range }}</span>
+                    <a href="{{ $element.link }}" target="_blank" class="amz-btn">View on Amazon UK</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{ end }}
+</div>
