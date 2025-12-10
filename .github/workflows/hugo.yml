@@ -1,6 +1,5 @@
 buildFuture = true
 buildDrafts = true
-
 baseURL = "https://thereviewandrecipenetwork.com/"
 languageCode = "en-us"
 title = "The Review & Recipe Network"
