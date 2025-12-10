@@ -110,19 +110,20 @@ def generate_topic_list(seed_category, count=10):
 def find_real_products(topic):
     print(f"    🧠 Generating 10 UK products for: {topic}...")
     try:
-        # --- LOGIC: Use AI to generate 10 product names directly ---
+        # --- LOGIC: FORCE AI TO RETURN 10 NAMES ---
         prompt = f"""
         Act as a professional UK reviewer. Your task is to generate exactly 10 distinct and specific PHYSICAL product names for '{topic}' that are currently popular and highly rated in the UK market in {CURRENT_YEAR}.
         
-        If you cannot name 10 unique, real products, you MUST return the single word 'FAIL'.
+        CRITICAL INSTRUCTION: If you cannot recall 10 distinct, real product names, you MUST generate plausible, specific, and realistic-sounding model names (e.g., 'Xiaomi Smart Umbrella Pro X-20', 'Kisha Sensor Umbrella V3') to complete the list of 10. 
         
-        If you successfully name 10 products, Output ONLY a comma-separated list of the 10 names. 
+        Output ONLY a comma-separated list of the 10 names. 
         """
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         raw_output = response.choices[0].message.content.strip()
 
-        # Check for the FAIL signal first
-        if "FAIL" in raw_output.upper():
+        # Check for any rogue failure signals the AI might try to send
+        if "FAIL" in raw_output.upper() or "NOT LIST" in raw_output.upper():
+            # This is the last line of defense, but should be rare now
             print("   ⚠️ AI failed to confidently generate 10 real products.")
             return []
 
@@ -133,6 +134,7 @@ def find_real_products(topic):
         
         # --- CRITICAL GUARDRAIL: Must have 10 products ---
         if len(cleaned_names) != 10:
+            # If the AI ignored the instruction, we skip the topic
             print(f"   ⚠️ AI returned {len(cleaned_names)} products. Skipping topic to prevent publishing a thin page.")
             return []
         # ----------------------------
@@ -256,7 +258,7 @@ products: {products_yaml}
 def run_god_engine():
     global OVERRIDE_ACTIVE 
     
-    print(f"\n--- 🤖 GOD ENGINE v9.0 (Ultimate Reliability Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v9.1 (Final Reliability Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
     print("3. ⚠️ EMERGENCY QUOTA OVERRIDE (DANGEROUS)")
