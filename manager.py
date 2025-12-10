@@ -73,36 +73,46 @@ def find_real_products(topic):
     print(f"    🔎  Researching 10 UK products for: {topic}...")
     try:
         with DDGS() as ddgs:
-            # Search specifically for UK reviews and buying guides
-            results = list(ddgs.text(f"best top rated {topic} uk {CURRENT_YEAR} reviews", max_results=15))
+            # Search deeper to find 10 unique product names
+            results = list(ddgs.text(f"best top rated {topic} uk {CURRENT_YEAR} reviews", max_results=30))
         if not results: return []
         
-        prompt = f"Extract 10 distinct product names from these UK snippets: {str(results)}. Return comma-separated list."
+        # We ask for 10 distinct names
+        prompt = f"From the following UK snippets, extract 10 distinct and specific PHYSICAL product names (e.g., 'Ninja AF101', 'Simplehuman Sensor Mirror'). Return ONLY a comma-separated list of names. Snippets: {str(results)}"
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         names = response.choices[0].message.content.split(",")
         
+        # --- CRITICAL NEW GUARDRAIL ---
         products = []
-        for name in names[:10]:
-            clean = name.strip()
+        cleaned_names = [n.strip() for n in names if n.strip()][:10]
+        
+        if len(cleaned_names) < 5:
+            print(f"   ⚠️ AI only found {len(cleaned_names)} specific products. Skipping topic to prevent crash.")
+            return []
+        # --------------------------------
+
+        for name in cleaned_names:
             # UK Affiliate Search Link
-            link = f"https://www.amazon.co.uk/s?k={clean.replace(' ', '+')}&tag={AMAZON_TAG}"
+            link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
             # Add dynamic placeholder for the grid
             products.append({
-                "name": clean, 
+                "name": name, 
                 "link": link, 
                 "price_range": "Check Price £" 
             })
         return products
     except Exception as e:
-        print(f"   ⚠️  Search error: {e}")
+        print(f"   ❌ Final Search Error: {e}")
         return []
 
 # ==========================================
 #  ✍️  MODULE 3: WRITER (PROFESSIONAL GRID)
 # ==========================================
 def create_page(topic, page_type="reviews"):
-    if not check_quota(): return False
+    # Exit if Quota is hit OR if product finder returned < 5 products
     products = find_real_products(topic) if page_type == "reviews" else []
+    if not products: return False
+    if not check_quota(): return False
     
     # 1. Build Product YAML for Front Matter (Required for the new Grid Layout)
     products_yaml = ""
@@ -128,9 +138,9 @@ def create_page(topic, page_type="reviews"):
        <hr style="margin: 30px 0; border-color: #e2e8f0;">
        <h3>User Reviews</h3>
        <div id="comments-placeholder">
-            <p><em>Comments are enabled. (Configure Giscus ID in manager.py to activate).</em></p>
+            <p><em>Comments are enabled. (You need to set up GitHub Discussions/Giscus for comments to appear).</em></p>
        </div>
-       </div>
+    </div>
     """
 
     # 3. Write Content (British English)
@@ -140,7 +150,7 @@ def create_page(topic, page_type="reviews"):
     - **Front Matter:**
       - title: "{topic} (UK Guide {CURRENT_YEAR})"
       - date: {datetime.date.today()}
-      - tags: ["Reviews", "Home", "Best Of"]
+      - tags: ["Reviews", "Home"] (Add a tag relevant to the topic category for the tiles page)
     
     - **Content:**
       1. Professional Intro.
@@ -195,7 +205,7 @@ products: {products_yaml}
 #  🚀  MAIN CONTROL PANEL
 # ==========================================
 if __name__ == "__main__":
-    print(f"\n--- 🤖 GOD ENGINE v5.0 (Professional UK Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v6.0 (Professional UK Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
     
