@@ -1,0 +1,33 @@
+baseURL = "https://yourusername.github.io/"
+title = "The Review & Recipe Network"
+theme = "PaperMod"
+languageCode = "en-us"
+
+# This ensures Google can find your tags (Locations/Ingredients)
+[taxonomies]
+  category = "categories"
+  tag = "tags"
+  location = "locations"
+
+[params]
+  defaultTheme = "light"
+  # This shows the "Review", "Directory", "Recipe" links at the top
+  [params.homeInfoParams]
+    Title = "Welcome"
+    Content = "Find the best products, local services, and recipes."
+
+[[menu.main]]
+  identifier = "reviews"
+  name = "Product Reviews"
+  url = "/reviews/"
+  weight = 10
+[[menu.main]]
+  identifier = "directory"
+  name = "Local Directory"
+  url = "/directory/"
+  weight = 20
+[[menu.main]]
+  identifier = "recipes"
+  name = "Recipes"
+  url = "/recipes/"
+  weight = 30
