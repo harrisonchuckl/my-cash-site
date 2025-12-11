@@ -170,7 +170,7 @@ def find_real_products(topic):
         return []
 
 # ==========================================
-#  ✍️  MODULE 3: WRITER (PROFESSIONAL GRID)
+#  ✍️  MODULE 3: WRITER (PROFESSIONAL GRID + ADS)
 # ==========================================
 def create_page(topic, page_type="reviews"):
     # 1. Product Generation
@@ -183,7 +183,6 @@ def create_page(topic, page_type="reviews"):
     # 3. Build Product YAML for Front Matter
     products_yaml = ""
     for p in products:
-        # NOTE: Added summary field to YAML structure
         products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "'")}"'
 
     # 4. Engagement Widgets
@@ -210,8 +209,7 @@ def create_page(topic, page_type="reviews"):
     </div>
     """
 
-    # 5. Write Content (British English)
-    # The prompt MUST change to reflect that the mini-reviews are already generated.
+    # 5. Write Content (British English + Ad Placement)
     prompt = f"""
     Write a Professional British English Review for '{topic}'.
     
@@ -221,10 +219,11 @@ def create_page(topic, page_type="reviews"):
       - tags: ["Reviews", "Home"] (Add a tag relevant to the topic category for the tiles page)
     
     - **Content:**
-      1. Professional Intro.
-      2. **CRITICAL:** Do NOT write mini-reviews or a comparison table. I will insert the ranked cards automatically.
-      3. Write a detailed Buying Guide section.
-      4. Conclusion.
+      1. Professional Intro (1 Paragraph).
+      2. **CRITICAL:** IMMEDIATELY after the intro, write the shortcode: {{{{< ad_mid >}}}}
+      3. **CRITICAL:** Do NOT write mini-reviews or a comparison table. I will insert the ranked cards automatically.
+      4. Write a detailed Buying Guide section.
+      5. Conclusion.
     
     - **Tone:** Professional, Helpful, British spelling (Colour, Customised).
     """
@@ -236,7 +235,7 @@ def create_page(topic, page_type="reviews"):
         # Cleanup if AI adds dashes
         if "---" in body: body = body.split("---", 2)[2].strip()
 
-        # Construct Final File with Structured Data + Ranked Cards
+        # Construct Final File with Ads + Widgets
         final_content = f"""---
 title: "{topic} (UK Guide {CURRENT_YEAR})"
 date: {datetime.date.today()}
@@ -245,11 +244,11 @@ tags: ["Reviews", "Home"]
 products: {products_yaml}
 ---
 
-{body}
+{{{{< ad_top >}}}}  {body}
 
-{{{{< ranked_cards >}}}}
+{{{{< top10_grid >}}}}
 
-{engagement_html}
+{{{{< ad_footer >}}}} {engagement_html}
 """
         
         filename = topic.lower().replace(" ", "-")[:50] + ".md"
@@ -273,7 +272,7 @@ products: {products_yaml}
 def run_god_engine():
     global OVERRIDE_ACTIVE 
     
-    print(f"\n--- 🤖 GOD ENGINE v10.0 (Ranked Card Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v11.0 (AdSense Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
     print("3. ⚠️ EMERGENCY QUOTA OVERRIDE (DANGEROUS)")
