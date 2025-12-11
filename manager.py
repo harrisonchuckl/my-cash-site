@@ -235,7 +235,8 @@ def create_page(topic, page_type="reviews"):
         # Cleanup if AI adds dashes
         if "---" in body: body = body.split("---", 2)[2].strip()
 
-        # Construct Final File with Ads + Widgets
+        # Construct Final File with Ads + Widgets + SPACING FIXES
+        # FIX: Added <br> and newlines to prevent Markdown headers from breaking
         final_content = f"""---
 title: "{topic} (UK Guide {CURRENT_YEAR})"
 date: {datetime.date.today()}
@@ -244,11 +245,21 @@ tags: ["Reviews", "Home"]
 products: {products_yaml}
 ---
 
-{{{{< ad_top >}}}}  {body}
+{{{{< ad_top >}}}}
+
+<br>
+
+{body}
+
+<br>
 
 {{{{< top10_grid >}}}}
 
-{{{{< ad_footer >}}}} {engagement_html}
+<br>
+
+{{{{< ad_footer >}}}}
+
+{engagement_html}
 """
         
         filename = topic.lower().replace(" ", "-")[:50] + ".md"
@@ -272,7 +283,7 @@ products: {products_yaml}
 def run_god_engine():
     global OVERRIDE_ACTIVE 
     
-    print(f"\n--- 🤖 GOD ENGINE v11.0 (AdSense Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v11.1 (Safe Spacing Edition) ---")
     print("1. Manual Mode (Write 1 specific page)")
     print("2. Auto-Discovery Mode (Generate pages from a category)")
     print("3. ⚠️ EMERGENCY QUOTA OVERRIDE (DANGEROUS)")
