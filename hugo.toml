@@ -43,3 +43,8 @@ languageCode = "en-us"
   name = "Recipes"
   url = "/recipes/"
   weight = 40 # Moved down
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
