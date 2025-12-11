@@ -78,24 +78,14 @@ def get_existing_titles():
 def generate_topic_list(seed_category, count=10):
     print(f" 🧠  Brainstorming {count} UK topics for '{seed_category}'...")
     existing_titles = get_existing_titles()
-    
-    blacklist_prompt = ""
-    if existing_titles:
-        blacklist_sample = ", ".join(list(existing_titles)[:5]) 
-        blacklist_prompt = f"DO NOT generate any titles similar to these: {blacklist_sample}. "
+    blacklist_prompt = f"DO NOT generate titles similar to: {', '.join(list(existing_titles)[:5])}." if existing_titles else ""
     
     prompt = f"Generate {count} specific 'Best X' product titles for UK market {CURRENT_YEAR}. {blacklist_prompt}Focus on items popular in Britain. Output list only."
     
     response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
     raw_list = response.choices[0].message.content.strip().split("\n")
     
-    new_topics = []
-    for t in raw_list:
-        clean_t = t.strip("- ").split(". ")[-1]
-        if clean_t.split()[0].title() not in existing_titles:
-            new_topics.append(clean_t)
-        
-    return new_topics[:count]
+    return [t.strip("- ").split(". ")[-1] for t in raw_list if t.strip("- ").split(". ")[-1].split()[0].title() not in existing_titles][:count]
 
 def find_real_products(topic):
     print(f"    🧠 Generating 10 UK products for: {topic}...")
@@ -107,32 +97,18 @@ def find_real_products(topic):
         Output ONLY a valid JSON array of objects with 'name' and 'summary' fields.
         """
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
-        raw_output = response.choices[0].message.content.strip()
-
-        if raw_output.startswith("```json"):
-            raw_output = raw_output.replace("```json", "").replace("```", "").strip()
-
-        if "FAIL" in raw_output.upper() or not raw_output.startswith("["):
-            print("   ⚠️ AI failed to confidently generate 10 products.")
-            return []
-            
+        raw_output = response.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
+        
         product_data = json.loads(raw_output)
-
         products = []
+        
         for item in product_data[:10]:
             name = item.get("name", "").strip()
             summary = item.get("summary", "").strip()
-            
             if name and summary:
-                # FIXED: Clean URL generation for the new "View Deal" button
-                link = f"[https://www.amazon.co.uk/s?k=](https://www.amazon.co.uk/s?k=){name.replace(' ', '+')}&tag={AMAZON_TAG}"
-                
-                products.append({
-                    "name": name, 
-                    "link": link, 
-                    "price_range": "Check Price £",
-                    "summary": summary
-                })
+                # FIXED: This now generates a clean URL for the button, not a markdown link.
+                link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
+                products.append({"name": name, "link": link, "price_range": "Check Price £", "summary": summary})
 
         return products if len(products) == 10 else []
     except Exception as e:
@@ -140,27 +116,26 @@ def find_real_products(topic):
         return []
 
 # ==========================================
-#  ✍️  MODULE 3: WRITER (POWER LIST + ADS)
+#  ✍️  MODULE 3: WRITER (ENTERPRISE LIST + ADS)
 # ==========================================
 def create_page(topic, page_type="reviews"):
     products = find_real_products(topic) if page_type == "reviews" else []
     if not products: return False
-    
     if not check_quota(): return False
     
-    # Build YAML with Summaries for the new Card Layout
+    # Build YAML for Power List
     products_yaml = ""
     for p in products:
         products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "'")}"'
 
-    # Engagement Widgets (Safeguarded with textwrap)
+    # Engagement Widgets (Updated for Enterprise Design - White Background)
     engagement_html = textwrap.dedent("""
-    <div id="engagement-section" style="margin-top:50px; padding:20px; background:#f8fafc; border-radius:12px; border:1px solid #eee;">
-       <h3 style="text-align:center; color:#333;">Rate this Guide</h3>
-       <div class="stars" onclick="rate(this)" style="text-align:center; cursor:pointer; font-size:2.5rem; color:#ff5500;">
+    <div id="engagement-section" style="margin-top:60px; padding:30px; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; text-align:center;">
+       <h3 style="color:#111827; font-weight:800; margin-bottom:1rem;">Was this guide helpful?</h3>
+       <div class="stars" onclick="rate(this)" style="cursor:pointer; font-size:2.5rem; color:#ff5500; letter-spacing:5px;">
             &#9734;&#9734;&#9734;&#9734;&#9734;
        </div>
-       <p id="msg" style="display:none; text-align:center; color:green; font-weight:bold;">Thanks for voting!</p>
+       <p id="msg" style="display:none; color:#059669; font-weight:bold; margin-top:10px;">Thank you for your feedback.</p>
        <script>
             function rate(el) {
                 el.innerHTML = "&#9733;&#9733;&#9733;&#9733;&#9733;";
@@ -168,10 +143,10 @@ def create_page(topic, page_type="reviews"):
                 localStorage.setItem('voted_'+window.location.pathname, 'true');
             }
        </script>
-       <hr style="margin: 30px 0; border-color: #eee;">
-       <h3>User Reviews</h3>
+       <hr style="margin: 30px 0; border-color: #e5e7eb;">
+       <h3 style="color:#111827; font-weight:800;">Discussion</h3>
        <div id="comments-placeholder">
-            <p><em>Comments are enabled.</em></p>
+            <p style="color:#6b7280;"><em>Community comments are currently enabled.</em></p>
        </div>
     </div>
     """).strip()
@@ -182,10 +157,10 @@ def create_page(topic, page_type="reviews"):
     - Content:
       1. Professional Intro (1 Paragraph).
       2. **CRITICAL:** IMMEDIATELY after the intro, write the shortcode: {{{{< ad_mid >}}}}
-      3. **CRITICAL:** Do NOT write mini-reviews/tables. I will insert the ranked cards automatically.
-      4. Detailed Buying Guide.
+      3. **CRITICAL:** Do NOT write mini-reviews or a comparison table. I will insert the ranked list automatically.
+      4. Detailed Buying Guide (What to look for, key features).
       5. Conclusion.
-    - Tone: Professional, Helpful, British spelling.
+    - Tone: Professional, Authoritative, British spelling. STRICTLY NO EMOJIS.
     """
     
     try:
@@ -193,7 +168,7 @@ def create_page(topic, page_type="reviews"):
         body = response.choices[0].message.content.strip()
         if "---" in body: body = body.split("---", 2)[2].strip()
 
-        # Construct Final File with NEW Ranked Cards Layout
+        # Construct Final File with NEW "Ranked Cards" Layout
         final_content = f"""---
 title: "{topic} (UK Guide {CURRENT_YEAR})"
 date: {datetime.date.today()}
@@ -236,10 +211,10 @@ products: {products_yaml}
 # ==========================================
 def run_god_engine():
     global OVERRIDE_ACTIVE 
-    print(f"\n--- 🤖 GOD ENGINE v13.0 (Mirafit Power List) ---")
+    print(f"\n--- 🤖 GOD ENGINE v14.0 (Enterprise Design) ---")
     print("1. Manual Mode\n2. Auto Mode\n3. Override")
-    mode = input("Select Mode: ")
     
+    mode = input("Select Mode: ")
     if mode == "3":
         if input("Type 'YES' to override: ").upper() == 'YES': OVERRIDE_ACTIVE = True; mode = input("Select 1 or 2: ")
         else: return run_god_engine() 
@@ -248,7 +223,9 @@ def run_god_engine():
     elif mode == "2":
         seed = input("Category: ")
         qty = int(input("Qty: "))
-        for t in generate_topic_list(seed, qty):
+        topics = generate_topic_list(seed, qty)
+        print(f" 📋 Queued {len(topics)} topics...")
+        for t in topics:
             if not create_page(t, "reviews"): break
             time.sleep(3)
 
