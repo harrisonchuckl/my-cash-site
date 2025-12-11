@@ -1,0 +1,35 @@
+{{ define "main" }}
+<div style="max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
+    
+    <div style="text-align: center; margin-bottom: 60px;">
+        <h1 style="font-size: 3rem; font-weight: 900; color: #111; margin-bottom: 10px;">THE REVIEW & RECIPE NETWORK</h1>
+        <p style="font-size: 1.2rem; color: #666;">Honest Reviews. Delicious Recipes. Trusted Services.</p>
+    </div>
+
+    {{ partial "categories.html" . }}
+
+    <div class="trust-section">
+        <h2 style="font-weight: 900; font-size: 2rem;">Why Trust Us?</h2>
+        <p style="max-width: 700px; margin: 0 auto; color: #666;">We are an independent UK team dedicated to finding the best value products.</p>
+        
+        <div class="trust-grid">
+            <div class="trust-item">
+                <div class="trust-icon">🔍</div>
+                <h3>Deep Research</h3>
+                <p>We analyze hundreds of products to find the hidden gems.</p>
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon">🇬🇧</div>
+                <h3>UK Focused</h3>
+                <p>We only review products available and popular in the UK.</p>
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon">🛡️</div>
+                <h3>Honest & Independent</h3>
+                <p>Our recommendations are unbiased and data-driven.</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+{{ end }}

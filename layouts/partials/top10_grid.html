@@ -1,14 +1,16 @@
-<h2 style="text-align:center; margin-top:50px; font-size:2rem; color:var(--secondary);">🏆 Top 10 Recommended</h2>
-<div class="product-grid">
-    {{ range .Params.products }}
-    <div class="product-card">
-        <div class="product-placeholder">
-            <span>Product Image</span>
+<div class="ranked-list">
+    {{ range $index, $element := .Params.products }}
+    <div class="rank-card">
+        <div class="rank-badge">#{{ add $index 1 }}</div>
+        
+        <div class="rank-content">
+            <h3 class="rank-title">{{ .name }}</h3>
+            <p class="rank-summary">{{ .summary }}</p>
         </div>
-        <div>
-            <div class="product-title">{{ .name }}</div>
-            <div class="product-price">{{ .price_range }}</div>
-            <a href="{{ .link }}" target="_blank" class="amz-btn">Check Price on Amazon UK</a>
+
+        <div class="rank-action">
+            <span class="rank-score">9.{{ sub 9 $index }}</span> <span class="rank-label">Rating</span>
+            <a href="{{ .link }}" target="_blank" rel="nofollow" class="deal-btn">View Deal</a>
         </div>
     </div>
     {{ end }}

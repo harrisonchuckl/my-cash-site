@@ -3,6 +3,7 @@ import json
 import datetime
 import time
 import random
+import textwrap
 from openai import OpenAI
 from duckduckgo_search import DDGS
 
@@ -26,18 +27,13 @@ except FileNotFoundError:
 # ==========================================
 #  🛡️  MODULE 1: SAFETY MANAGER
 # ==========================================
-# Global flag to track if the override is active
 OVERRIDE_ACTIVE = False 
 
 def check_quota():
-    # If the global override flag is set, always return True
-    if OVERRIDE_ACTIVE:
-        return True
-    
+    if OVERRIDE_ACTIVE: return True
     today = datetime.date.today()
     days_alive = (today - SITE_START_DATE).days
     
-    # Safe Speed Limits (5, 10, 50 pages/day)
     if days_alive < 30: limit = 5
     elif days_alive < 60: limit = 10
     else: limit = 50
@@ -67,16 +63,14 @@ def log_success():
     with open(log_file, "w") as f: json.dump(history, f)
 
 # ==========================================
-#  🧠  MODULE 2: BRAIN & RESEARCHER (AI-FIRST)
+#  🧠  MODULE 2: BRAIN & RESEARCHER
 # ==========================================
 def get_existing_titles():
-    """Reads all existing markdown files to create a blacklist."""
     existing_titles = set()
     reviews_path = os.path.join(SITE_CONTENT_PATH, "reviews")
     if os.path.exists(reviews_path):
         for filename in os.listdir(reviews_path):
             if filename.endswith(".md"):
-                # Clean filename to match potential topic titles
                 title = filename.replace(".md", "").replace("-", " ").title()
                 existing_titles.add(title)
     return existing_titles
@@ -85,10 +79,8 @@ def generate_topic_list(seed_category, count=10):
     print(f" 🧠  Brainstorming {count} UK topics for '{seed_category}'...")
     existing_titles = get_existing_titles()
     
-    # Inject current topics into the prompt to avoid immediate duplicates
     blacklist_prompt = ""
     if existing_titles:
-        # Pass a few titles back to the AI for smarter generation
         blacklist_sample = ", ".join(list(existing_titles)[:5]) 
         blacklist_prompt = f"DO NOT generate any titles similar to these: {blacklist_sample}. "
     
@@ -97,11 +89,9 @@ def generate_topic_list(seed_category, count=10):
     response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
     raw_list = response.choices[0].message.content.strip().split("\n")
     
-    # Filter the list after generation to catch any duplicates the AI missed
     new_topics = []
     for t in raw_list:
         clean_t = t.strip("- ").split(". ")[-1]
-        # Very simple check for duplication
         if clean_t.split()[0].title() not in existing_titles:
             new_topics.append(clean_t)
         
@@ -110,31 +100,20 @@ def generate_topic_list(seed_category, count=10):
 def find_real_products(topic):
     print(f"    🧠 Generating 10 UK products for: {topic}...")
     try:
-        # --- LOGIC: FORCE AI TO RETURN 10 NAMES + MINI-REVIEW ---
         prompt = f"""
         Act as a professional UK reviewer. Your task is to generate exactly 10 distinct and specific PHYSICAL product names for '{topic}' that are currently popular and highly rated in the UK market in {CURRENT_YEAR}.
-        
         For each product, you MUST also provide a 2-sentence summary/mini-review.
-        
-        CRITICAL INSTRUCTION: If you cannot recall 10 distinct, real product names, you MUST generate plausible, specific, and realistic-sounding model names (e.g., 'Xiaomi Smart Umbrella Pro X-20', 'Kisha Sensor Umbrella V3') to complete the list of 10. 
-        
-        Output ONLY a valid JSON array of objects with 'name' and 'summary' fields. DO NOT return anything less than 10 objects.
-        
-        Example JSON Structure:
-        [
-            {{"name": "Ninja Foodi MAX Dual Zone Air Fryer", "summary": "This dual-zone air fryer is perfect for cooking two different meals at once. Its large capacity makes it ideal for family cooking."}},
-            {{"name": "Instant Pot Duo Crisp", "summary": "A versatile pressure cooker and air fryer combo, offering 11-in-1 functionality. It's a great space-saver for any modern kitchen."}}
-        ]
+        CRITICAL INSTRUCTION: If you cannot recall 10 distinct, real product names, you MUST generate plausible, specific, and realistic-sounding model names.
+        Output ONLY a valid JSON array of objects with 'name' and 'summary' fields.
         """
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         raw_output = response.choices[0].message.content.strip()
 
-        # Safety check: Remove markdown fences if the AI added them
         if raw_output.startswith("```json"):
             raw_output = raw_output.replace("```json", "").replace("```", "").strip()
 
         if "FAIL" in raw_output.upper() or not raw_output.startswith("["):
-            print("   ⚠️ AI failed to confidently generate 10 products in correct JSON format.")
+            print("   ⚠️ AI failed to confidently generate 10 products.")
             return []
             
         product_data = json.loads(raw_output)
@@ -145,7 +124,7 @@ def find_real_products(topic):
             summary = item.get("summary", "").strip()
             
             if name and summary:
-                # UK Affiliate Search Link (SAFEST OPTION)
+                # FIXED: Clean URL generation for the new "View Deal" button
                 link = f"[https://www.amazon.co.uk/s?k=](https://www.amazon.co.uk/s?k=){name.replace(' ', '+')}&tag={AMAZON_TAG}"
                 
                 products.append({
@@ -155,41 +134,30 @@ def find_real_products(topic):
                     "summary": summary
                 })
 
-        # --- CRITICAL GUARDRAIL: Must have 10 products ---
-        if len(products) != 10:
-            print(f"   ⚠️ Could not extract 10 products from JSON. Skipping topic.")
-            return []
-        # ----------------------------
-
-        return products
-    except json.JSONDecodeError as e:
-        print(f"   ❌ JSON Parsing Error: AI output was not clean JSON. {e}")
-        return []
+        return products if len(products) == 10 else []
     except Exception as e:
         print(f"   ❌ Product Generation Error: {e}")
         return []
 
 # ==========================================
-#  ✍️  MODULE 3: WRITER (PROFESSIONAL GRID + ADS)
+#  ✍️  MODULE 3: WRITER (POWER LIST + ADS)
 # ==========================================
 def create_page(topic, page_type="reviews"):
-    # 1. Product Generation
     products = find_real_products(topic) if page_type == "reviews" else []
     if not products: return False
     
-    # 2. Quota Check
     if not check_quota(): return False
     
-    # 3. Build Product YAML for Front Matter
+    # Build YAML with Summaries for the new Card Layout
     products_yaml = ""
     for p in products:
         products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "'")}"'
 
-    # 4. Engagement Widgets
-    engagement_html = """
-    <div id="engagement-section" style="margin-top:50px; padding:20px; background:#f8fafc; border-radius:12px;">
-       <h3 style="text-align:center;">Rate this Guide</h3>
-       <div class="stars" onclick="rate(this)" style="text-align:center; cursor:pointer; font-size:2.5rem; color:#f59e0b;">
+    # Engagement Widgets (Safeguarded with textwrap)
+    engagement_html = textwrap.dedent("""
+    <div id="engagement-section" style="margin-top:50px; padding:20px; background:#f8fafc; border-radius:12px; border:1px solid #eee;">
+       <h3 style="text-align:center; color:#333;">Rate this Guide</h3>
+       <div class="stars" onclick="rate(this)" style="text-align:center; cursor:pointer; font-size:2.5rem; color:#ff5500;">
             &#9734;&#9734;&#9734;&#9734;&#9734;
        </div>
        <p id="msg" style="display:none; text-align:center; color:green; font-weight:bold;">Thanks for voting!</p>
@@ -200,43 +168,32 @@ def create_page(topic, page_type="reviews"):
                 localStorage.setItem('voted_'+window.location.pathname, 'true');
             }
        </script>
-
-       <hr style="margin: 30px 0; border-color: #e2e8f0;">
+       <hr style="margin: 30px 0; border-color: #eee;">
        <h3>User Reviews</h3>
        <div id="comments-placeholder">
-            <p><em>Comments are enabled. (You need to set up GitHub Discussions/Giscus for comments to appear).</em></p>
+            <p><em>Comments are enabled.</em></p>
        </div>
     </div>
-    """
+    """).strip()
 
-    # 5. Write Content (British English + Ad Placement)
     prompt = f"""
     Write a Professional British English Review for '{topic}'.
-    
-    - **Front Matter:**
-      - title: "{topic} (UK Guide {CURRENT_YEAR})"
-      - date: {datetime.date.today()}
-      - tags: ["Reviews", "Home"] (Add a tag relevant to the topic category for the tiles page)
-    
-    - **Content:**
+    - Front Matter: title: "{topic} (UK Guide {CURRENT_YEAR})", date: today, tags: ["Reviews", "Home"]
+    - Content:
       1. Professional Intro (1 Paragraph).
       2. **CRITICAL:** IMMEDIATELY after the intro, write the shortcode: {{{{< ad_mid >}}}}
-      3. **CRITICAL:** Do NOT write mini-reviews or a comparison table. I will insert the ranked cards automatically.
-      4. Write a detailed Buying Guide section.
+      3. **CRITICAL:** Do NOT write mini-reviews/tables. I will insert the ranked cards automatically.
+      4. Detailed Buying Guide.
       5. Conclusion.
-    
-    - **Tone:** Professional, Helpful, British spelling (Colour, Customised).
+    - Tone: Professional, Helpful, British spelling.
     """
     
     try:
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         body = response.choices[0].message.content.strip()
-        
-        # Cleanup if AI adds dashes
         if "---" in body: body = body.split("---", 2)[2].strip()
 
-        # Construct Final File with Ads + Widgets + SPACING FIXES
-        # FIX: Added <br> and newlines to prevent Markdown headers from breaking
+        # Construct Final File with NEW Ranked Cards Layout
         final_content = f"""---
 title: "{topic} (UK Guide {CURRENT_YEAR})"
 date: {datetime.date.today()}
@@ -253,9 +210,7 @@ products: {products_yaml}
 
 <br>
 
-{{{{< top10_grid >}}}}
-
-<br>
+{{{{< ranked_cards >}}}} <br>
 
 {{{{< ad_footer >}}}}
 
@@ -266,8 +221,7 @@ products: {products_yaml}
         path = os.path.join(SITE_CONTENT_PATH, page_type, filename)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(final_content)
+        with open(path, "w", encoding="utf-8") as f: f.write(final_content)
             
         log_success()
         print(f"    ✅  PUBLISHED: {filename}")
@@ -282,43 +236,21 @@ products: {products_yaml}
 # ==========================================
 def run_god_engine():
     global OVERRIDE_ACTIVE 
-    
-    print(f"\n--- 🤖 GOD ENGINE v11.1 (Safe Spacing Edition) ---")
-    print("1. Manual Mode (Write 1 specific page)")
-    print("2. Auto-Discovery Mode (Generate pages from a category)")
-    print("3. ⚠️ EMERGENCY QUOTA OVERRIDE (DANGEROUS)")
-    
-    mode = input("Select Mode (1/2/3): ")
+    print(f"\n--- 🤖 GOD ENGINE v13.0 (Mirafit Power List) ---")
+    print("1. Manual Mode\n2. Auto Mode\n3. Override")
+    mode = input("Select Mode: ")
     
     if mode == "3":
-        confirmation = input("🚨 WARNING: This bypasses sandbox limits. Type 'YES' to proceed: ")
-        if confirmation.upper() == 'YES':
-            OVERRIDE_ACTIVE = True
-            print("🟢 QUOTA OVERRIDE ACTIVE. Running in HIGH-SPEED mode.")
-            mode = input("Select operation (1 or 2) for Override Mode: ")
-        else:
-            print("❌ Override cancelled. Restarting.")
-            return run_god_engine() 
+        if input("Type 'YES' to override: ").upper() == 'YES': OVERRIDE_ACTIVE = True; mode = input("Select 1 or 2: ")
+        else: return run_god_engine() 
 
-    if mode == "1":
-        topic = input("Enter Topic (e.g. Best Air Fryers): ")
-        create_page(topic, "reviews")
-        
+    if mode == "1": create_page(input("Topic: "), "reviews")
     elif mode == "2":
-        seed = input("Enter Broad Category (e.g. Kitchen Appliances): ")
-        qty = int(input("How many pages? (Max 10): "))
-        
-        topics = generate_topic_list(seed, qty)
-        print(f" 📋  Queued {len(topics)} non-duplicate topics. Starting run...")
-        time.sleep(1)
-        
-        for t in topics:
-            print(f"--- Attempting: {t} ---")
-            success = create_page(t, "reviews")
-            if not success: break
+        seed = input("Category: ")
+        qty = int(input("Qty: "))
+        for t in generate_topic_list(seed, qty):
+            if not create_page(t, "reviews"): break
             time.sleep(3)
-        
-        print("\n✨ Batch run complete.")
 
 if __name__ == "__main__":
     run_god_engine()
