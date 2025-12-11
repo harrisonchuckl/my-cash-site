@@ -9,11 +9,14 @@
         <div class="rank-content">
             <h3 class="rank-title">{{ .name }}</h3>
             <p class="rank-summary">{{ .summary }}</p>
+            <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">
+                <span style="color: #f59e0b;">★★★★☆</span> {{ .review_count }} Reviews
+            </div>
         </div>
 
         <div class="rank-action">
             <div>
-                <div class="rank-rating">9.{{ sub 9 $index }}</div>
+                <div class="rank-rating">{{ .score }}</div>
                 <div class="rank-rating-label">Expert Score</div>
             </div>
             <a href="{{ .link }}" target="_blank" rel="nofollow" class="deal-btn">
