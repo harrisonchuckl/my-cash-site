@@ -34,6 +34,7 @@ def check_quota():
     if OVERRIDE_ACTIVE: return True
     today = datetime.date.today()
     days_alive = (today - SITE_START_DATE).days
+    
     if days_alive < 30: limit = 5
     elif days_alive < 60: limit = 10
     else: limit = 50
@@ -45,6 +46,7 @@ def check_quota():
     
     today_str = str(today)
     today_count = history.get(today_str, 0)
+    
     print(f" 📊  Daily Quota: {today_count}/{limit}")
     
     if today_count >= limit: return False
@@ -58,6 +60,17 @@ def log_success():
     else: history = {}
     history[today_str] = history.get(today_str, 0) + 1
     with open(log_file, "w") as f: json.dump(history, f)
+
+def clean_year_from_text(text):
+    """Aggressively removes years (2024-2026) from any string."""
+    cleaned = re.sub(r'[\(\[\-]?\b(?:in\s+|of\s+)?20[2-3]\d\b[\)\]]?', '', text, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+def sanitize_filename(title):
+    """Forces filename to be lowercase alphanumeric only."""
+    clean = clean_year_from_text(title)
+    clean = re.sub(r'[^a-zA-Z0-9\s]', '', clean)
+    return clean.lower().strip().replace(" ", "-")[:60] + ".md"
 
 # ==========================================
 #  🧠  MODULE 2: BRAIN & RESEARCHER
@@ -77,21 +90,21 @@ def generate_topic_list(seed_category, count=10):
     existing_titles = get_existing_titles()
     blacklist_prompt = f"DO NOT generate titles similar to: {', '.join(list(existing_titles)[:5])}." if existing_titles else ""
     
-    # FIX: Instruct AI to NOT include the year in the list
-    prompt = f"Generate {count} specific 'Best X' product titles for UK market. Do NOT include the year '{CURRENT_YEAR}' in the strings. Focus on items popular in Britain. Output list only."
+    # --- FIXED PROMPT: Now explicitly uses '{seed_category}' ---
+    prompt = f"Generate {count} specific 'Best X' product titles for the category '{seed_category}' for the UK market. Do NOT include the year '{CURRENT_YEAR}' in the strings. Output list only."
     
     try:
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         raw_list = response.choices[0].message.content.strip().split("\n")
-        return [t.strip("- ").split(". ")[-1] for t in raw_list if t.strip("- ").split(". ")[-1] not in existing_titles][:count]
+        # Clean years immediately from the brainstormed list
+        return [clean_year_from_text(t.strip("- ").split(". ")[-1]) for t in raw_list if t.strip("- ").split(". ")[-1] not in existing_titles][:count]
     except: return []
 
 def find_real_products(topic):
     print(f"    🧠 Researching products for: {topic}...")
     try:
-        # We search WITH the year to get new items, but we don't put it in the title later
         with DDGS() as ddgs:
-            results = list(ddgs.text(f"best rated {topic} amazon uk {CURRENT_YEAR} reviews", max_results=8))
+            results = list(ddgs.text(f"best rated {topic} amazon uk reviews", max_results=8))
         
         prompt = f"""
         Act as an Expert Product Researcher for the UK market.
@@ -116,7 +129,7 @@ def find_real_products(topic):
         products = []
         
         for item in product_data[:10]:
-            name = item.get("name", "").strip()
+            name = clean_year_from_text(item.get("name", "").strip())
             summary = item.get("summary", "").strip()
             if name:
                 link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
@@ -134,11 +147,7 @@ def find_real_products(topic):
 #  ✍️  MODULE 3: WRITER
 # ==========================================
 def create_page(topic, page_type="reviews"):
-    # --- V15.3 FIX: THE TIME MACHINE CLEANER ---
-    # 1. Regex removes "2025", "in 2025", "of 2025" case insensitive
-    clean_topic = re.sub(r'\b(?:in\s+|of\s+)?20\d{2}\b', '', topic, flags=re.IGNORECASE).strip()
-    # 2. Remove File-Breaking Characters (: " /)
-    safe_topic = clean_topic.replace(":", "").replace('"', '').replace("/", " ").strip()
+    safe_topic = clean_year_from_text(topic)
     
     products = find_real_products(safe_topic) if page_type == "reviews" else []
     if not products: return False
@@ -162,7 +171,7 @@ def create_page(topic, page_type="reviews"):
 
     prompt = f"""
     Write a High-Authority British English Review for '{safe_topic}'.
-    - Title: "{safe_topic}" (NO YEARS)
+    - Title: "{safe_topic}" (Do NOT use dates/years like 2025)
     - Intro: Hook reader. Ad injection: {{{{< ad_mid >}}}}.
     - Body: "## Top Picks". Buying Guide. FAQ (4 questions).
     - Tone: Expert, British. NO EMOJIS. NO YEARS in headers.
@@ -171,6 +180,7 @@ def create_page(topic, page_type="reviews"):
     try:
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         body = response.choices[0].message.content.strip().replace("---", "")
+        body = clean_year_from_text(body) # Double-check body text for years
 
         final_content = f"""---
 title: "{safe_topic}"
@@ -200,7 +210,7 @@ products: {products_yaml}
 
 {engagement_html}
 """
-        filename = safe_topic.lower().replace(" ", "-")[:50] + ".md"
+        filename = sanitize_filename(safe_topic)
         with open(os.path.join(SITE_CONTENT_PATH, page_type, filename), "w") as f: f.write(final_content)
         log_success()
         print(f"    ✅  PUBLISHED: {filename}")
@@ -218,16 +228,16 @@ def update_all_pages():
     if not os.path.exists(path): return
     for f in os.listdir(path):
         if f.endswith(".md"):
-            # Strips year from filename title too
             topic = f.replace(".md", "").replace("-", " ").title()
-            clean_topic = re.sub(r'\b(?:in\s+|of\s+)?20\d{2}\b', '', topic, flags=re.IGNORECASE).strip()
+            clean_topic = clean_year_from_text(topic)
             print(f" ♻️  Updating: {clean_topic}...")
-            create_page(clean_topic, "reviews")
+            if create_page(clean_topic, "reviews"):
+                pass
             time.sleep(2)
 
 def run_god_engine():
     global OVERRIDE_ACTIVE 
-    print(f"\n--- 🤖 GOD ENGINE v15.3 (Timeless Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v16.1 (Brain Fix Edition) ---")
     mode = input("1. Manual\n2. Auto\n3. Override\n4. Update All\nSelect: ")
     if mode == "3": OVERRIDE_ACTIVE = True; mode = input("Select 1, 2 or 4: ")
     
@@ -242,4 +252,3 @@ def run_god_engine():
 
 if __name__ == "__main__":
     run_god_engine()
-    
