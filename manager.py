@@ -34,7 +34,6 @@ def check_quota():
     if OVERRIDE_ACTIVE: return True
     today = datetime.date.today()
     days_alive = (today - SITE_START_DATE).days
-    
     if days_alive < 30: limit = 5
     elif days_alive < 60: limit = 10
     else: limit = 50
@@ -46,12 +45,9 @@ def check_quota():
     
     today_str = str(today)
     today_count = history.get(today_str, 0)
+    print(f" 📊  Daily Quota: {today_count}/{limit}")
     
-    print(f" 📊  Daily Quota: {today_count}/{limit} | Site Age: {days_alive} days")
-    
-    if today_count >= limit:
-        print(f" 🛑  DAILY LIMIT REACHED. Stopping.")
-        return False
+    if today_count >= limit: return False
     return True
 
 def log_success():
@@ -72,7 +68,6 @@ def get_existing_titles():
     if os.path.exists(reviews_path):
         for filename in os.listdir(reviews_path):
             if filename.endswith(".md"):
-                # Convert "best-kettles.md" -> "Best Kettles"
                 title = filename.replace(".md", "").replace("-", " ").title()
                 existing_titles.add(title)
     return existing_titles
@@ -82,59 +77,40 @@ def generate_topic_list(seed_category, count=10):
     existing_titles = get_existing_titles()
     blacklist_prompt = f"DO NOT generate titles similar to: {', '.join(list(existing_titles)[:5])}." if existing_titles else ""
     
-    prompt = f"Generate {count} specific 'Best X' product titles for UK market {CURRENT_YEAR}. {blacklist_prompt}Focus on items popular in Britain. Output list only."
+    # FIX: Instruct AI to NOT include the year in the list
+    prompt = f"Generate {count} specific 'Best X' product titles for UK market. Do NOT include the year '{CURRENT_YEAR}' in the strings. Focus on items popular in Britain. Output list only."
     
-    response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
-    raw_list = response.choices[0].message.content.strip().split("\n")
-    
-    # Simple deduplication
-    clean_list = []
-    for t in raw_list:
-        clean = t.strip("- ").split(". ")[-1]
-        if clean not in existing_titles:
-            clean_list.append(clean)
-            
-    return clean_list[:count]
+    try:
+        response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
+        raw_list = response.choices[0].message.content.strip().split("\n")
+        return [t.strip("- ").split(". ")[-1] for t in raw_list if t.strip("- ").split(". ")[-1] not in existing_titles][:count]
+    except: return []
 
 def find_real_products(topic):
-    print(f"    🧠 Researching Top 10 High-Rated UK products for: {topic}...")
+    print(f"    🧠 Researching products for: {topic}...")
     try:
-        # Search specifically for "Best [Topic] UK Reviews" to get high-quality items
+        # We search WITH the year to get new items, but we don't put it in the title later
         with DDGS() as ddgs:
-            results = list(ddgs.text(f"best rated {topic} amazon uk {CURRENT_YEAR} reviews", max_results=10))
+            results = list(ddgs.text(f"best rated {topic} amazon uk {CURRENT_YEAR} reviews", max_results=8))
         
-        context = str(results)
-
         prompt = f"""
         Act as an Expert Product Researcher for the UK market.
-        Based on these search results: {context} AND your internal knowledge of high-performing brands in the UK.
-        
+        Based on search results: {str(results)}.
         Identify the 10 BEST products for '{topic}'.
         
         CRITERIA:
-        1. Must be real products available in the UK.
-        2. Prioritize products with HIGH review counts (1000+).
-        3. Assign a realistic "Expert Score" (out of 10) based on quality (e.g. 9.8, 9.5, 9.1). NOT just 10, 9, 8.
-        4. Estimate the review count (e.g., "2,500+", "1,200+").
+        1. Real products available in the UK.
+        2. Assign a realistic "Expert Score" (e.g. 9.8, 9.5).
+        3. Estimate reviews (e.g., "1,500+").
         
-        Output ONLY a valid JSON array of objects:
-        [
-            {{
-                "name": "Exact Product Name", 
-                "summary": "2-sentence why it's good.",
-                "score": "9.8",
-                "reviews": "1,500+"
-            }}
-        ]
+        Output ONLY a valid JSON array:
+        [ {{ "name": "Product Name", "summary": "Why it's good.", "score": "9.8", "reviews": "1,500+" }} ]
         """
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         raw_output = response.choices[0].message.content.strip()
         
-        # Clean JSON markdown if present
-        if "```json" in raw_output:
-            raw_output = raw_output.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw_output:
-            raw_output = raw_output.split("```")[0].strip()
+        if "```" in raw_output:
+            raw_output = raw_output.split("```json")[-1].split("```")[0].strip() if "json" in raw_output else raw_output.split("```")[-1].strip()
             
         product_data = json.loads(raw_output)
         products = []
@@ -142,97 +118,70 @@ def find_real_products(topic):
         for item in product_data[:10]:
             name = item.get("name", "").strip()
             summary = item.get("summary", "").strip()
-            score = item.get("score", "9.0")
-            reviews = item.get("reviews", "100+")
-            
-            if name and summary:
-                link = f"[https://www.amazon.co.uk/s?k=](https://www.amazon.co.uk/s?k=){name.replace(' ', '+')}&tag={AMAZON_TAG}"
+            if name:
+                link = f"https://www.amazon.co.uk/s?k={name.replace(' ', '+')}&tag={AMAZON_TAG}"
                 products.append({
-                    "name": name, 
-                    "link": link, 
-                    "price_range": "Check Price £", 
-                    "summary": summary,
-                    "score": score,
-                    "review_count": reviews
+                    "name": name, "link": link, "price_range": "Check Price £", 
+                    "summary": summary, "score": item.get("score", "9.0"), 
+                    "review_count": item.get("reviews", "100+")
                 })
-
-        return products if len(products) == 10 else []
+        return products
     except Exception as e:
-        print(f"   ❌ Product Research Error: {e}")
+        print(f"   ⚠️ Research Error: {e}")
         return []
 
 # ==========================================
-#  ✍️  MODULE 3: WRITER (AUTHORITY CONTENT)
+#  ✍️  MODULE 3: WRITER
 # ==========================================
 def create_page(topic, page_type="reviews"):
-    products = find_real_products(topic) if page_type == "reviews" else []
-    if not products: return False
+    # --- V15.3 FIX: THE TIME MACHINE CLEANER ---
+    # 1. Regex removes "2025", "in 2025", "of 2025" case insensitive
+    clean_topic = re.sub(r'\b(?:in\s+|of\s+)?20\d{2}\b', '', topic, flags=re.IGNORECASE).strip()
+    # 2. Remove File-Breaking Characters (: " /)
+    safe_topic = clean_topic.replace(":", "").replace('"', '').replace("/", " ").strip()
     
-    # If using Override/Update mode, we skip quota check usually, but let's keep it safe
+    products = find_real_products(safe_topic) if page_type == "reviews" else []
+    if not products: return False
     if not check_quota(): return False
     
-    # Build YAML with NEW Fields (Score, Reviews)
     products_yaml = ""
     for p in products:
-        products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "'")}"\n    score: "{p["score"]}"\n    review_count: "{p["review_count"]}"'
+        products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "")}"\n    score: "{p["score"]}"\n    review_count: "{p["review_count"]}"'
 
-    # Engagement Widgets
     engagement_html = textwrap.dedent("""
     <div id="engagement-section" style="margin-top:60px; padding:30px; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; text-align:center;">
        <h3 style="color:#111827; font-weight:800; margin-bottom:1rem;">Was this guide helpful?</h3>
-       <div class="stars" onclick="rate(this)" style="cursor:pointer; font-size:2.5rem; color:#ff5500; letter-spacing:5px;">
-            &#9734;&#9734;&#9734;&#9734;&#9734;
-       </div>
+       <div class="stars" onclick="rate(this)" style="cursor:pointer; font-size:2.5rem; color:#ff5500; letter-spacing:5px;">&#9734;&#9734;&#9734;&#9734;&#9734;</div>
        <p id="msg" style="display:none; color:#059669; font-weight:bold; margin-top:10px;">Thank you for your feedback.</p>
-       <script>
-            function rate(el) {
-                el.innerHTML = "&#9733;&#9733;&#9733;&#9733;&#9733;";
-                document.getElementById('msg').style.display='block';
-                localStorage.setItem('voted_'+window.location.pathname, 'true');
-            }
-       </script>
+       <script>function rate(el){el.innerHTML="&#9733;&#9733;&#9733;&#9733;&#9733;";document.getElementById('msg').style.display='block';localStorage.setItem('voted_'+window.location.pathname,'true');}</script>
        <hr style="margin: 30px 0; border-color: #e5e7eb;">
        <h3 style="color:#111827; font-weight:800;">Discussion</h3>
-       <div id="comments-placeholder">
-            <p style="color:#6b7280;"><em>Community comments are currently enabled.</em></p>
-       </div>
+       <div id="comments-placeholder"><p style="color:#6b7280;"><em>Community comments are currently enabled.</em></p></div>
     </div>
     """).strip()
 
-    # V15 PROMPT: No Fluff, FAQ, Updates
     prompt = f"""
-    Write a High-Authority British English Review for '{topic}'.
-    
-    - **Front Matter:** - Title: "{topic} (UK Guide {CURRENT_YEAR})"
-      - Date: {datetime.date.today()}
-      - Tags: ["Reviews", "Home"]
-    
-    - **Content Guidelines:**
-      1. **Intro (Journalist Style):** NO generic "In today's world" fluff. Start with the problem and the solution immediately. Mention that this list is updated for {CURRENT_YEAR}.
-      2. **Ad Injection:** Write {{{{< ad_mid >}}}} immediately after the intro.
-      3. **The List:** Do NOT write the product list text. Just write: "## Top 10 Picks for {CURRENT_YEAR}" and then I will insert the widget.
-      4. **Buying Guide:** deeply detailed, technical but accessible.
-      5. **FAQ Section:** Write a "Frequently Asked Questions" section with 4-5 common questions about {topic} and helpful answers.
-      6. **"See Also":** A small section recommending checking other reviews in the Home category.
-      
-    - **Tone:** Authoritative, Expert, British (Colour, Optimised). NO EMOJIS.
+    Write a High-Authority British English Review for '{safe_topic}'.
+    - Title: "{safe_topic}" (NO YEARS)
+    - Intro: Hook reader. Ad injection: {{{{< ad_mid >}}}}.
+    - Body: "## Top Picks". Buying Guide. FAQ (4 questions).
+    - Tone: Expert, British. NO EMOJIS. NO YEARS in headers.
     """
     
     try:
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
-        body = response.choices[0].message.content.strip()
-        if "---" in body: body = body.split("---", 2)[2].strip()
+        body = response.choices[0].message.content.strip().replace("---", "")
 
         final_content = f"""---
-title: "{topic} (UK Guide {CURRENT_YEAR})"
+title: "{safe_topic}"
 date: {datetime.date.today()}
-description: "Professional review of the best {topic} in the UK market. Updated for {CURRENT_YEAR}."
+description: "Professional review of the best {safe_topic} in the UK market. Regularly updated rankings."
 tags: ["Reviews", "Home"]
 products: {products_yaml}
 ---
 
 <div class="update-notice" style="background:#f0fdf4; color:#166534; padding:10px; border-radius:6px; font-size:0.9rem; margin-bottom:20px; border:1px solid #bbf7d0;">
-    <strong>✅ Updated for {CURRENT_YEAR}:</strong> We regularly update this page to ensure you see the latest products and prices.
+    <strong>✅ Live Ranking:</strong> We regularly update this page to ensure you see the latest products and prices.
 </div>
 
 {{{{< ad_top >}}}}
@@ -251,17 +200,11 @@ products: {products_yaml}
 
 {engagement_html}
 """
-        
-        filename = topic.lower().replace(" ", "-")[:50] + ".md"
-        path = os.path.join(SITE_CONTENT_PATH, page_type, filename)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        
-        with open(path, "w", encoding="utf-8") as f: f.write(final_content)
-            
+        filename = safe_topic.lower().replace(" ", "-")[:50] + ".md"
+        with open(os.path.join(SITE_CONTENT_PATH, page_type, filename), "w") as f: f.write(final_content)
         log_success()
         print(f"    ✅  PUBLISHED: {filename}")
         return True
-        
     except Exception as e:
         print(f"    ❌  Error: {e}")
         return False
@@ -270,39 +213,24 @@ products: {products_yaml}
 #  🔄  MODULE 4: UPDATE ENGINE
 # ==========================================
 def update_all_pages():
-    print(" 🔄  STARTING MASS UPDATE (Refreshing Content)...")
-    reviews_path = os.path.join(SITE_CONTENT_PATH, "reviews")
-    if not os.path.exists(reviews_path):
-        print("No reviews found to update.")
-        return
+    print(" 🔄  STARTING MASS UPDATE...")
+    path = os.path.join(SITE_CONTENT_PATH, "reviews")
+    if not os.path.exists(path): return
+    for f in os.listdir(path):
+        if f.endswith(".md"):
+            # Strips year from filename title too
+            topic = f.replace(".md", "").replace("-", " ").title()
+            clean_topic = re.sub(r'\b(?:in\s+|of\s+)?20\d{2}\b', '', topic, flags=re.IGNORECASE).strip()
+            print(f" ♻️  Updating: {clean_topic}...")
+            create_page(clean_topic, "reviews")
+            time.sleep(2)
 
-    files = [f for f in os.listdir(reviews_path) if f.endswith(".md")]
-    print(f"Found {len(files)} pages to update.")
-    
-    for filename in files:
-        # Extract topic from filename (best-kettles.md -> Best Kettles)
-        topic = filename.replace(".md", "").replace("-", " ").title()
-        print(f" ♻️  Updating: {topic}...")
-        create_page(topic, "reviews") # This overwrites the old file with new data
-        time.sleep(2) # Safety pause
-
-# ==========================================
-#  🚀  MAIN CONTROL PANEL
-# ==========================================
 def run_god_engine():
     global OVERRIDE_ACTIVE 
-    print(f"\n--- 🤖 GOD ENGINE v15.0 (Authority & SEO) ---")
-    print("1. Manual Mode (Write 1 page)")
-    print("2. Auto-Discovery (New pages)")
-    print("3. Override Safety Limits")
-    print("4. ♻️ UPDATE ALL EXISTING PAGES (Fresh Data)")
+    print(f"\n--- 🤖 GOD ENGINE v15.3 (Timeless Edition) ---")
+    mode = input("1. Manual\n2. Auto\n3. Override\n4. Update All\nSelect: ")
+    if mode == "3": OVERRIDE_ACTIVE = True; mode = input("Select 1, 2 or 4: ")
     
-    mode = input("Select Mode: ")
-    
-    if mode == "3":
-        if input("Type 'YES' to override: ").upper() == 'YES': OVERRIDE_ACTIVE = True; mode = input("Select 1, 2 or 4: ")
-        else: return run_god_engine() 
-
     if mode == "1": create_page(input("Topic: "), "reviews")
     elif mode == "2":
         seed = input("Category: ")
@@ -310,8 +238,8 @@ def run_god_engine():
         for t in generate_topic_list(seed, qty):
             if not create_page(t, "reviews"): break
             time.sleep(3)
-    elif mode == "4":
-        update_all_pages()
+    elif mode == "4": update_all_pages()
 
 if __name__ == "__main__":
     run_god_engine()
+    
