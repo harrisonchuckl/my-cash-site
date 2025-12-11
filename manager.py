@@ -11,7 +11,7 @@ from duckduckgo_search import DDGS
 # ==========================================
 SITE_CONTENT_PATH = "./content"
 SITE_START_DATE = datetime.date(2025, 12, 10) 
-AMAZON_TAG = "yourtag-21"         
+AMAZON_TAG = "thereviewandr-20"         
 CURRENT_YEAR = datetime.date.today().year
 
 #  🔑  READ API KEY
