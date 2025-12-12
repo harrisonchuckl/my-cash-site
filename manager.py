@@ -73,7 +73,7 @@ def sanitize_filename(title):
     return clean.lower().strip().replace(" ", "-")[:60] + ".md"
 
 # ==========================================
-#  🧠  MODULE 2: BRAIN & RESEARCHER
+#  🧠  MODULE 2: BRAIN & RESEARCHER (UPGRADED)
 # ==========================================
 def get_existing_titles():
     existing_titles = set()
@@ -88,9 +88,7 @@ def get_existing_titles():
 def generate_topic_list(seed_category, count=10):
     print(f" 🧠  Brainstorming {count} UK topics for '{seed_category}'...")
     existing_titles = get_existing_titles()
-    blacklist_prompt = f"DO NOT generate titles similar to: {', '.join(list(existing_titles)[:5])}." if existing_titles else ""
     
-    # --- FIXED PROMPT: Now explicitly uses '{seed_category}' ---
     prompt = f"Generate {count} specific 'Best X' product titles for the category '{seed_category}' for the UK market. Do NOT include the year '{CURRENT_YEAR}' in the strings. Output list only."
     
     try:
@@ -104,21 +102,25 @@ def find_real_products(topic):
     print(f"    🧠 Researching products for: {topic}...")
     try:
         with DDGS() as ddgs:
-            results = list(ddgs.text(f"best rated {topic} amazon uk reviews", max_results=8))
+            # We add "products" to the search to help filter out blog posts about general ideas
+            results = list(ddgs.text(f"best top rated {topic} models uk reviews", max_results=8))
         
+        # --- INTELLIGENCE UPGRADE: STRICT FILTERING ---
         prompt = f"""
-        Act as an Expert Product Researcher for the UK market.
-        Based on search results: {str(results)}.
-        Identify the 10 BEST products for '{topic}'.
-        
-        CRITERIA:
-        1. Real products available in the UK.
-        2. Assign a realistic "Expert Score" (e.g. 9.8, 9.5).
-        3. Estimate reviews (e.g., "1,500+").
-        
+        Act as a Strict Product Data Validator for the UK market.
+        Your Goal: Extract exactly 10 distinct, physical product names for '{topic}' based on: {str(results)}.
+
+        CRITICAL FILTERING RULES:
+        1. **Strict Relevance:** The product MUST be the actual item described in '{topic}', NOT an accessory. 
+           - Example: If topic is "Tea Sets", return actual Teapots/Cups. REJECT "Cake Stands", "Spoons", or "Tea Towels".
+           - Example: If topic is "Laptops", REJECT "Laptop Cases".
+        2. **Core Definition:** If the search results contain mostly accessories (like cake stands), IGNORE THEM and instead generate real, highly-rated model names that fit the TRUE definition of '{topic}'.
+        3. **UK Availability:** Must be sold in the UK.
+
         Output ONLY a valid JSON array:
-        [ {{ "name": "Product Name", "summary": "Why it's good.", "score": "9.8", "reviews": "1,500+" }} ]
+        [ {{ "name": "Product Name", "summary": "Why it fits the category perfectly.", "score": "9.8", "reviews": "1,500+" }} ]
         """
+        
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         raw_output = response.choices[0].message.content.strip()
         
@@ -180,7 +182,7 @@ def create_page(topic, page_type="reviews"):
     try:
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
         body = response.choices[0].message.content.strip().replace("---", "")
-        body = clean_year_from_text(body) # Double-check body text for years
+        body = clean_year_from_text(body) 
 
         final_content = f"""---
 title: "{safe_topic}"
@@ -237,7 +239,7 @@ def update_all_pages():
 
 def run_god_engine():
     global OVERRIDE_ACTIVE 
-    print(f"\n--- 🤖 GOD ENGINE v16.1 (Brain Fix Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v17.0 (Smart Filter Edition) ---")
     mode = input("1. Manual\n2. Auto\n3. Override\n4. Update All\nSelect: ")
     if mode == "3": OVERRIDE_ACTIVE = True; mode = input("Select 1, 2 or 4: ")
     
