@@ -73,7 +73,7 @@ def sanitize_filename(title):
     return clean.lower().strip().replace(" ", "-")[:60] + ".md"
 
 # ==========================================
-#  🧠  MODULE 2: BRAIN & RESEARCHER (SMART FILTER SAFEGUARDED)
+#  🧠  MODULE 2: BRAIN & RESEARCHER (FULL TEXT UPGRADE)
 # ==========================================
 def get_existing_titles():
     existing_titles = set()
@@ -105,7 +105,7 @@ def find_real_products(topic):
             # We add "products" to the search to help filter out blog posts about general ideas
             results = list(ddgs.text(f"best top rated {topic} models uk reviews", max_results=8))
         
-        # --- SAFEGUARDED: STRICT FILTERING LOGIC (Tea Set Fix) ---
+        # --- SAFEGUARDED: STRICT FILTERING + NEW FULL PARAGRAPH REQUEST ---
         prompt = f"""
         Act as a Strict Product Data Validator for the UK market.
         Your Goal: Extract exactly 10 distinct, physical product names for '{topic}' based on: {str(results)}.
@@ -118,7 +118,7 @@ def find_real_products(topic):
         3. **UK Availability:** Must be sold in the UK.
 
         Output ONLY a valid JSON array:
-        [ {{ "name": "Product Name", "summary": "Why it fits the category perfectly.", "score": "9.8", "reviews": "1,500+" }} ]
+        [ {{ "name": "Product Name", "summary": "Write a detailed 3-4 sentence mini-review (approx 50 words) explaining EXACTLY why this product is a top pick. Mention specific features.", "score": "9.8", "reviews": "1,500+" }} ]
         """
         
         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
@@ -157,7 +157,9 @@ def create_page(topic, page_type="reviews"):
     
     products_yaml = ""
     for p in products:
-        products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "")}"\n    score: "{p["score"]}"\n    review_count: "{p["review_count"]}"'
+        # Sanitize summary to prevent YAML breaks with quotes
+        clean_summary = p["summary"].replace("\"", "").replace("'", "")
+        products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{clean_summary}"\n    score: "{p["score"]}"\n    review_count: "{p["review_count"]}"'
 
     # UPDATED: Royal Blue/Gold Engagement Section with GISCUS
     engagement_html = textwrap.dedent("""
@@ -269,7 +271,7 @@ def update_all_pages():
 
 def run_god_engine():
     global OVERRIDE_ACTIVE 
-    print(f"\n--- 🤖 GOD ENGINE v18.0 (Royal Blue & High Grid) ---")
+    print(f"\n--- 🤖 GOD ENGINE v19.0 (Full Text + Green Buttons) ---")
     mode = input("1. Manual\n2. Auto\n3. Override\n4. Update All\nSelect: ")
     if mode == "3": OVERRIDE_ACTIVE = True; mode = input("Select 1, 2 or 4: ")
     

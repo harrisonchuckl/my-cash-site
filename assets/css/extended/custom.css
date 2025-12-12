@@ -1,8 +1,8 @@
-/* --- THEME: ROYAL AUTHORITY V2 (Refined Gold & Navy) --- */
+/* --- THEME: TRUST & AUTHORITY (Navy, White & Green) --- */
 :root {
     --brand-dark: #0f172a;       /* Deep Navy */
     --brand-primary: #1e40af;    /* Royal Blue */
-    --brand-gold: #cca43b;       /* True Premium Gold (Not Orange) */
+    --brand-green: #16a34a;      /* Success/Buy Green */
     --brand-bg: #f8fafc;
     --white: #ffffff;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -11,67 +11,86 @@
 body { background-color: var(--brand-bg); color: #334155; font-family: 'Inter', sans-serif; }
 
 /* 1. HEADER */
-.nav { background: var(--brand-dark); padding: 15px 0; border-bottom: 3px solid var(--brand-gold); }
-.logo a { color: var(--white) !important; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
-#menu a { color: #e2e8f0; font-size: 0.9rem; font-weight: 500; }
-#menu a:hover { color: var(--brand-gold); }
+.nav { background: var(--brand-dark); padding: 20px 0; border-bottom: 4px solid var(--brand-primary); }
+.logo a { color: var(--white) !important; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+#menu a { color: #e2e8f0; font-size: 0.95rem; font-weight: 500; }
+#menu a:hover { color: var(--white); text-decoration: underline; }
 
 /* 2. RANKED CARDS (The List) */
-.ranked-list { display: flex; flex-direction: column; gap: 20px; margin: 30px 0; }
+.ranked-list { display: flex; flex-direction: column; gap: 30px; margin: 40px 0; }
 
 .rank-card {
-    display: flex; background: var(--white); border-radius: 10px;
+    display: flex; background: var(--white); border-radius: 12px;
     box-shadow: var(--shadow); overflow: hidden; border: 1px solid #e2e8f0;
-    min-height: 160px; /* Ensure consistency */
+    min-height: 220px; /* TALLER CARDS */
 }
 
-/* Rank Badge (Left) - FIXED SIZING */
+/* Rank Badge (Left) - Navy & White */
 .rank-badge {
-    background: var(--brand-dark); color: var(--brand-gold);
-    width: 60px; flex-shrink: 0;
+    background: var(--brand-dark); color: var(--white);
+    width: 70px; flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    line-height: 1; padding: 10px 0;
+    padding: 15px 0;
 }
-.rank-num { font-size: 1.8rem; font-weight: 800; }
-.rank-lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; color: #94a3b8; }
+.rank-num { font-size: 2rem; font-weight: 800; line-height: 1; }
+.rank-lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; opacity: 0.8; }
 
-/* Content (Middle) */
-.rank-content { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
-.rank-title { font-size: 1.2rem; font-weight: 700; color: var(--brand-dark); margin-bottom: 8px; line-height: 1.3; }
-.rank-summary { font-size: 0.95rem; color: #64748b; margin: 0; line-height: 1.5; }
+/* Content (Middle) - SPACIOUS */
+.rank-content { 
+    padding: 25px 30px; 
+    flex-grow: 1; 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+}
+.rank-title { 
+    font-size: 1.4rem; 
+    font-weight: 700; 
+    color: var(--brand-dark); 
+    margin-bottom: 12px; 
+    line-height: 1.3; 
+}
+.rank-summary { 
+    font-size: 1rem; 
+    color: #475569; 
+    margin: 0; 
+    line-height: 1.6; /* Better readability for paragraphs */
+}
 
-/* Action Area (Right) - FIXED OVERFLOW */
+/* Action Area (Right) */
 .rank-action {
-    background: #f8fafc; width: 160px; flex-shrink: 0;
+    background: #f8fafc; width: 180px; flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 15px; border-left: 1px solid #e2e8f0;
+    padding: 20px; border-left: 1px solid #e2e8f0;
 }
 
-/* Score Circle Styling */
+/* Score Circle */
 .score-badge {
-    width: 60px; height: 60px;
+    width: 65px; height: 65px;
     border-radius: 50%;
-    border: 3px solid var(--brand-primary);
+    background: var(--white);
+    border: 4px solid var(--brand-primary);
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.4rem; font-weight: 800; color: var(--brand-dark);
-    margin-bottom: 10px; background: white;
+    font-size: 1.5rem; font-weight: 800; color: var(--brand-dark);
+    margin-bottom: 10px;
 }
-.score-lbl { font-size: 0.7rem; color: #64748b; margin-bottom: 12px; }
+.score-lbl { font-size: 0.75rem; color: #64748b; margin-bottom: 15px; font-weight: 600; }
 
-/* Button Styling - FIXED SIZING */
+/* Button - GREEN (Amazon Style) */
 .deal-btn {
-    background: var(--brand-gold); color: var(--white) !important;
-    font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
-    padding: 10px 15px; border-radius: 5px; text-decoration: none;
+    background: var(--brand-green); color: var(--white) !important;
+    font-size: 0.9rem; font-weight: 700; text-transform: uppercase;
+    padding: 12px 20px; border-radius: 6px; text-decoration: none;
     width: 100%; text-align: center; white-space: nowrap;
-    transition: background 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background 0.2s, transform 0.1s;
 }
-.deal-btn:hover { background: #b08d33; }
+.deal-btn:hover { background: #15803d; transform: translateY(-1px); }
 
 /* 3. ENGAGEMENT BOX */
 #engagement-section {
-    margin-top: 50px; background: var(--white); padding: 30px; 
-    border-radius: 12px; border-top: 4px solid var(--brand-gold); text-align: center;
+    margin-top: 60px; background: var(--white); padding: 40px; 
+    border-radius: 16px; border: 1px solid #e2e8f0; text-align: center;
 }
 
 /* Mobile Fix */
@@ -81,4 +100,5 @@ body { background-color: var(--brand-bg); color: #334155; font-family: 'Inter', 
     .rank-action { width: 100%; flex-direction: row; justify-content: space-between; padding: 15px; border-left: none; border-top: 1px solid #eee; }
     .score-badge { width: 50px; height: 50px; font-size: 1.1rem; margin-bottom: 0; }
     .deal-btn { width: auto; padding: 10px 20px; }
+    .rank-content { padding: 20px; }
 }
