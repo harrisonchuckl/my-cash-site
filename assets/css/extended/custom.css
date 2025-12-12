@@ -1,4 +1,4 @@
-/* --- THEME: TRUST & AUTHORITY (Navy, White & Green) --- */
+/* --- THEME: TRUST & AUTHORITY V2 (Fixed Button Width) --- */
 :root {
     --brand-dark: #0f172a;       /* Deep Navy */
     --brand-primary: #1e40af;    /* Royal Blue */
@@ -22,10 +22,10 @@ body { background-color: var(--brand-bg); color: #334155; font-family: 'Inter', 
 .rank-card {
     display: flex; background: var(--white); border-radius: 12px;
     box-shadow: var(--shadow); overflow: hidden; border: 1px solid #e2e8f0;
-    min-height: 220px; /* TALLER CARDS */
+    min-height: 220px; 
 }
 
-/* Rank Badge (Left) - Navy & White */
+/* Rank Badge (Left) */
 .rank-badge {
     background: var(--brand-dark); color: var(--white);
     width: 70px; flex-shrink: 0;
@@ -35,7 +35,7 @@ body { background-color: var(--brand-bg); color: #334155; font-family: 'Inter', 
 .rank-num { font-size: 2rem; font-weight: 800; line-height: 1; }
 .rank-lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; opacity: 0.8; }
 
-/* Content (Middle) - SPACIOUS */
+/* Content (Middle) */
 .rank-content { 
     padding: 25px 30px; 
     flex-grow: 1; 
@@ -54,12 +54,14 @@ body { background-color: var(--brand-bg); color: #334155; font-family: 'Inter', 
     font-size: 1rem; 
     color: #475569; 
     margin: 0; 
-    line-height: 1.6; /* Better readability for paragraphs */
+    line-height: 1.6; 
 }
 
-/* Action Area (Right) */
+/* Action Area (Right) - WIDENED TO FIX BUTTON */
 .rank-action {
-    background: #f8fafc; width: 180px; flex-shrink: 0;
+    background: #f8fafc; 
+    width: 220px; /* Increased from 180px */
+    flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding: 20px; border-left: 1px solid #e2e8f0;
 }
@@ -76,12 +78,16 @@ body { background-color: var(--brand-bg); color: #334155; font-family: 'Inter', 
 }
 .score-lbl { font-size: 0.75rem; color: #64748b; margin-bottom: 15px; font-weight: 600; }
 
-/* Button - GREEN (Amazon Style) */
+/* Button - GREEN (Amazon Style) - FIXED OVERFLOW */
 .deal-btn {
     background: var(--brand-green); color: var(--white) !important;
-    font-size: 0.9rem; font-weight: 700; text-transform: uppercase;
-    padding: 12px 20px; border-radius: 6px; text-decoration: none;
-    width: 100%; text-align: center; white-space: nowrap;
+    font-size: 0.85rem; /* Slightly smaller text */
+    font-weight: 700; text-transform: uppercase;
+    padding: 12px 15px; 
+    border-radius: 6px; text-decoration: none;
+    width: 100%; text-align: center; 
+    white-space: normal; /* Allows text to wrap if needed */
+    line-height: 1.2;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     transition: background 0.2s, transform 0.1s;
 }
