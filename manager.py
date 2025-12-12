@@ -73,7 +73,7 @@ def sanitize_filename(title):
     return clean.lower().strip().replace(" ", "-")[:60] + ".md"
 
 # ==========================================
-#  🧠  MODULE 2: BRAIN & RESEARCHER (UPGRADED)
+#  🧠  MODULE 2: BRAIN & RESEARCHER (SMART FILTER SAFEGUARDED)
 # ==========================================
 def get_existing_titles():
     existing_titles = set()
@@ -105,7 +105,7 @@ def find_real_products(topic):
             # We add "products" to the search to help filter out blog posts about general ideas
             results = list(ddgs.text(f"best top rated {topic} models uk reviews", max_results=8))
         
-        # --- INTELLIGENCE UPGRADE: STRICT FILTERING ---
+        # --- SAFEGUARDED: STRICT FILTERING LOGIC (Tea Set Fix) ---
         prompt = f"""
         Act as a Strict Product Data Validator for the UK market.
         Your Goal: Extract exactly 10 distinct, physical product names for '{topic}' based on: {str(results)}.
@@ -146,7 +146,7 @@ def find_real_products(topic):
         return []
 
 # ==========================================
-#  ✍️  MODULE 3: WRITER
+#  ✍️  MODULE 3: WRITER (ROYAL BLUE DESIGN + HIGH GRID)
 # ==========================================
 def create_page(topic, page_type="reviews"):
     safe_topic = clean_year_from_text(topic)
@@ -159,24 +159,46 @@ def create_page(topic, page_type="reviews"):
     for p in products:
         products_yaml += f'\n  - name: "{p["name"]}"\n    link: "{p["link"]}"\n    price_range: "{p["price_range"]}"\n    summary: "{p["summary"].replace("\"", "")}"\n    score: "{p["score"]}"\n    review_count: "{p["review_count"]}"'
 
+    # UPDATED: Royal Blue/Gold Engagement Section with GISCUS
     engagement_html = textwrap.dedent("""
     <div id="engagement-section" style="margin-top:60px; padding:30px; background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; text-align:center;">
-       <h3 style="color:#111827; font-weight:800; margin-bottom:1rem;">Was this guide helpful?</h3>
-       <div class="stars" onclick="rate(this)" style="cursor:pointer; font-size:2.5rem; color:#ff5500; letter-spacing:5px;">&#9734;&#9734;&#9734;&#9734;&#9734;</div>
-       <p id="msg" style="display:none; color:#059669; font-weight:bold; margin-top:10px;">Thank you for your feedback.</p>
+       <h3 style="color:#1e3a8a; font-weight:800; margin-bottom:1rem;">Was this guide helpful?</h3>
+       <div class="stars" onclick="rate(this)" style="cursor:pointer; font-size:2.5rem; color:#d97706; letter-spacing:5px; transition: transform 0.2s;">&#9734;&#9734;&#9734;&#9734;&#9734;</div>
+       <p id="msg" style="display:none; color:#059669; font-weight:bold; margin-top:10px;">Thank you for your feedback!</p>
        <script>function rate(el){el.innerHTML="&#9733;&#9733;&#9733;&#9733;&#9733;";document.getElementById('msg').style.display='block';localStorage.setItem('voted_'+window.location.pathname,'true');}</script>
-       <hr style="margin: 30px 0; border-color: #e5e7eb;">
-       <h3 style="color:#111827; font-weight:800;">Discussion</h3>
-       <div id="comments-placeholder"><p style="color:#6b7280;"><em>Community comments are currently enabled.</em></p></div>
-    </div>
+       
+       <hr style="margin: 40px 0; border-color: #e5e7eb;">
+       
+       <h3 style="color:#1e3a8a; font-weight:800; margin-bottom: 20px;">Join the Discussion</h3>
+       <script src="https://giscus.app/client.js"
+        data-repo="harrisonchuckl/my-cash-site"
+        data-repo-id="R_kgDONN3QQA" 
+        data-category="General"
+        data-category-id="DIC_kwDONN3QQM4CkM3k"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="light"
+        data-lang="en"
+        crossorigin="anonymous"
+        async>
+        </script>
+        </div>
     """).strip()
 
+    # UPDATED: Prompt asks AI to stop after Intro (so we can insert Grid)
     prompt = f"""
     Write a High-Authority British English Review for '{safe_topic}'.
-    - Title: "{safe_topic}" (Do NOT use dates/years like 2025)
-    - Intro: Hook reader. Ad injection: {{{{< ad_mid >}}}}.
-    - Body: "## Top Picks". Buying Guide. FAQ (4 questions).
-    - Tone: Expert, British. NO EMOJIS. NO YEARS in headers.
+    - Title: "{safe_topic}"
+    - Intro: Hook reader (max 150 words). Ad injection: {{{{< ad_mid >}}}}.
+    - Body Structure: 
+      1. Intro
+      2. **STOP WRITING HERE.** (I will insert the Product List automatically)
+      3. Buying Guide (Detailed)
+      4. FAQ (4 questions)
+    - Tone: Expert, British. NO EMOJIS.
     """
     
     try:
@@ -184,6 +206,10 @@ def create_page(topic, page_type="reviews"):
         body = response.choices[0].message.content.strip().replace("---", "")
         body = clean_year_from_text(body) 
 
+        # --- UPDATED: REORDERED CONTENT STRUCTURE (Grid Moved Up) ---
+        # 1. Intro/Ad
+        # 2. **RANKED CARDS (Top 10)**
+        # 3. Buying Guide
         final_content = f"""---
 title: "{safe_topic}"
 date: {datetime.date.today()}
@@ -192,19 +218,24 @@ tags: ["Reviews", "Home"]
 products: {products_yaml}
 ---
 
-<div class="update-notice" style="background:#f0fdf4; color:#166534; padding:10px; border-radius:6px; font-size:0.9rem; margin-bottom:20px; border:1px solid #bbf7d0;">
-    <strong>✅ Live Ranking:</strong> We regularly update this page to ensure you see the latest products and prices.
+<div class="update-notice" style="background:#f0f9ff; color:#0369a1; padding:12px; border-radius:8px; font-size:0.95rem; margin-bottom:25px; border:1px solid #bae6fd; display:flex; align-items:center; gap:10px;">
+    <span>✅ <strong>Live Ranking:</strong> Regularly updated for {CURRENT_YEAR}.</span>
 </div>
 
 {{{{< ad_top >}}}}
 
 <br>
 
-{body}
+{body.split("Buying Guide")[0] if "Buying Guide" in body else body[:500]} 
 
 <br>
 
 {{{{< ranked_cards >}}}} 
+
+<br>
+
+## Buying Guide
+{body.split("Buying Guide")[1] if "Buying Guide" in body else ""}
 
 <br>
 
@@ -233,13 +264,12 @@ def update_all_pages():
             topic = f.replace(".md", "").replace("-", " ").title()
             clean_topic = clean_year_from_text(topic)
             print(f" ♻️  Updating: {clean_topic}...")
-            if create_page(clean_topic, "reviews"):
-                pass
+            create_page(clean_topic, "reviews")
             time.sleep(2)
 
 def run_god_engine():
     global OVERRIDE_ACTIVE 
-    print(f"\n--- 🤖 GOD ENGINE v17.0 (Smart Filter Edition) ---")
+    print(f"\n--- 🤖 GOD ENGINE v18.0 (Royal Blue & High Grid) ---")
     mode = input("1. Manual\n2. Auto\n3. Override\n4. Update All\nSelect: ")
     if mode == "3": OVERRIDE_ACTIVE = True; mode = input("Select 1, 2 or 4: ")
     
