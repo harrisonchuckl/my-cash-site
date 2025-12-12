@@ -2,26 +2,21 @@
     {{ range $index, $element := .Params.products }}
     <div class="rank-card">
         <div class="rank-badge">
-            {{ add $index 1 }}
-            <span>Rank</span>
+            <span class="rank-num">{{ add $index 1 }}</span>
+            <span class="rank-lbl">RANK</span>
         </div>
         
         <div class="rank-content">
-            <h3 class="rank-title">{{ .name }}</h3>
+            <a href="{{ .link }}" target="_blank" style="text-decoration: none;">
+                <h3 class="rank-title">{{ .name }}</h3>
+            </a>
             <p class="rank-summary">{{ .summary }}</p>
-            <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">
-                <span style="color: #f59e0b;">★★★★☆</span> {{ .review_count }} Reviews
-            </div>
         </div>
 
         <div class="rank-action">
-            <div>
-                <div class="rank-rating">{{ .score }}</div>
-                <div class="rank-rating-label">Expert Score</div>
-            </div>
-            <a href="{{ .link }}" target="_blank" rel="nofollow" class="deal-btn">
-                Check Price <span style="margin-left:5px;">&rarr;</span>
-            </a>
+            <div class="score-badge">{{ .score | default "9.5" }}</div>
+            <span class="score-lbl">Expert Score</span>
+            <a href="{{ .link }}" target="_blank" rel="nofollow" class="deal-btn">Check Price &rarr;</a>
         </div>
     </div>
     {{ end }}
